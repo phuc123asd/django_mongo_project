@@ -8,6 +8,11 @@ from mongoengine.errors import DoesNotExist, ValidationError
 from bson.errors import InvalidId
 from api.models.review import Review
 from api.serializers.review import ReviewSerializer
+from api.models.customer import Customer
+import logging
+
+# Cấu hình logging để in ra console
+logger = logging.getLogger(__name__)
 
 # api/views/review.py
 
@@ -60,3 +65,44 @@ def add_review_insecure(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['DELETE'])
+def delete_review(request, review_id):
+    """
+    API endpoint để xóa một bài đánh giá.
+    CẢNH BÁO: API này không yêu cầu xác thực. Bất kỳ ai cũng có thể xóa.
+    Chỉ nên dùng cho mục đích phát triển.
+    """
+    try:
+        # 1. Tìm bài đánh giá cần xóa
+        logger.info(f"Đang cố gắng xóa review với ID: {review_id}")
+        review = Review.objects.get(id=review_id)
+        logger.info(f"Tìm thấy review: {review.id}")
+
+        # 2. Xóa luôn, không kiểm tra quyền
+        review.delete()
+        logger.info(f"Đã xóa thành công review {review.id}")
+
+        return Response(
+            {"message": "Xóa bài đánh giá thành công."},
+            status=status.HTTP_200_OK
+        )
+
+    except DoesNotExist:
+        logger.error(f"Không tìm thấy review với ID: {review_id}")
+        return Response(
+            {"error": "Không tìm thấy bài đánh giá."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except (InvalidId, ValueError) as e:
+        logger.error(f"ID review không hợp lệ: {review_id}. Lỗi: {e}")
+        return Response(
+            {"error": "ID bài đánh giá không hợp lệ."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        logger.exception(f"Lỗi không xác định trong delete_review: {e}")
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

@@ -26,6 +26,7 @@ class OrderSerializer(serializers.Serializer):
     customer = serializers.SerializerMethodField()
     items = OrderItemSerializer(many=True, read_only=True)
     total_price = serializers.SerializerMethodField()
+    status = serializers.CharField()
     shipping_address = serializers.CharField()
     city = serializers.CharField()
     province = serializers.CharField()
@@ -86,7 +87,7 @@ class CreateOrderSerializer(serializers.Serializer):
     Serializer dùng để xác thực dữ liệu khi tạo một đơn hàng mới.
     """
     items = serializers.ListField(
-        child=serializers.DictField(child=serializers.CharField()), # <-- SỬA LỖI: Thêm dấu '='
+        child=serializers.DictField(child=serializers.CharField()),
         write_only=True,
         required=True
     )

@@ -58,8 +58,6 @@ def get_orders_by_customer(request, customer_id):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-# your_app/views.py
-
 @api_view(['GET'])
 # @permission_classes([IsAuthenticated])  # <-- XÓC hoặc COMMENT dòng này
 def get_order_detail(request, order_id):
