@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from pathlib import Path
+from decouple import config, Csv
+import mongoengine
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -88,9 +92,8 @@ DATABASES = {
     }
 }
 
-import mongoengine
 mongoengine.connect(
-    name='mydb', # <-- ĐÚNG RỒI
+    name='mydb',
     host='mongodb+srv://admin:123@cluster0.gdq3i7q.mongodb.net/?appName=Cluster0',
 )
 
@@ -167,3 +170,19 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Đọc SECRET_KEY
+SECRET_KEY = config('SECRET_KEY')
+
+# Đọc DEBUG mode (mặc định là False cho production)
+DEBUG = config('DEBUG', default=False, cast=bool)
+
+# Đọc danh sách các host được phép
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv())
+
+# Đọc API Keys
+OPENAI_API_KEY = config('OPENAI_API_KEY')
+ASTRA_DB_APPLICATION_TOKEN = config('ASTRA_DB_APPLICATION_TOKEN')
+ASTRA_API_ENDPOINT = config('ASTRA_API_ENDPOINT')
