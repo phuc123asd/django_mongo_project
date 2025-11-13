@@ -50,6 +50,7 @@ class OrderSerializer(serializers.Serializer):
     def get_price(self, obj):
         # obj.price là một Decimal, chuyển nó thành float để JSON serialize thành số
         return float(obj.price)
+
 class OrderDetailSerializer(OrderSerializer):
     customer = CustomerSerializer(read_only=True)
     
@@ -79,3 +80,70 @@ class OrderDetailSerializer(OrderSerializer):
                     'price': item.price
                 })
         return items
+
+class CreateOrderSerializer(serializers.Serializer):
+    """
+    Serializer dùng để xác thực dữ liệu khi tạo một đơn hàng mới.
+    """
+    items = serializers.ListField(
+        child=serializers.DictField(child=serializers.CharField()), # <-- SỬA LỖI: Thêm dấu '='
+        write_only=True,
+        required=True
+    )
+    shipping_address = serializers.CharField(max_length=255, required=True)
+    city = serializers.CharField(max_length=100, required=True)
+    province = serializers.CharField(max_length=100, required=True)
+    postal_code = serializers.CharField(max_length=20, required=True)
+    phone = serializers.CharField(max_length=20, required=True)
+
+    def validate_items(self, items):
+        """
+        Kiểm tra danh sách các mặt hàng trong đơn hàng.
+        - Đảm bảo không rỗng.
+        - Đảm bảo mỗi item có 'product_id' và 'quantity'.
+        - Kiểm tra sản phẩm có tồn tại không.
+        """
+        if not items:
+            raise serializers.ValidationError("Đơn hàng phải có ít nhất một sản phẩm.")
+
+        validated_items = []
+        product_ids = []
+        
+        # Lấy tất cả product_id để kiểm tra tồn tại một lần (tối ưu)
+        for item in items:
+            product_id = item.get('product')
+            if not product_id:
+                raise serializers.ValidationError("Mỗi sản phẩm phải có 'product_id'.")
+            product_ids.append(product_id)
+
+        # Kiểm tra sự tồn tại của các sản phẩm
+        existing_products = {str(p.id): p for p in Product.objects.filter(id__in=product_ids)}
+        
+        for item in items:
+            product_id = item.get('product')
+            quantity_str = item.get('quantity') # Lấy quantity dưới dạng chuỗi trước
+
+            # --- BẮT ĐẦU PHẦN SỬA ---
+            try:
+                # Cố gắng chuyển chuỗi thành số nguyên
+                quantity = int(quantity_str)
+            except (TypeError, ValueError):
+                # Nếu không chuyển được (ví dụ quantity là "abc" hoặc null)
+                raise serializers.ValidationError(f"Số lượng cho sản phẩm {product_id} phải là một số nguyên.")
+
+            # Kiểm tra xem số lượng có lớn hơn 0 không
+            if quantity <= 0:
+                raise serializers.ValidationError(f"Số lượng cho sản phẩm {product_id} phải lớn hơn 0.")
+            # --- KẾT THÚC PHẦN SỬA ---
+
+            if product_id not in existing_products:
+                raise serializers.ValidationError(f"Sản phẩm với ID {product_id} không tồn tại.")
+            
+            product = existing_products[product_id]
+            validated_items.append({
+                'product': product,
+                'quantity': quantity, # Dùng biến 'quantity' đã được chuyển đổi
+                'price': product.price
+            })
+        
+        return validated_items   
