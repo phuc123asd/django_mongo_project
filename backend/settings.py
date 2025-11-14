@@ -126,6 +126,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Cấu hình CORS
 CORS_ALLOWED_ORIGINS = [
+    "https://fontend-8jcm.onrender.com",
     "http://localhost:5173", # Cổng mặc định của Vite (React)
 ]
 CORS_ALLOW_CREDENTIALS = True
