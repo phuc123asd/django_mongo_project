@@ -47,7 +47,22 @@ INSTALLED_APPS = [
     # App của bạn
     'mongoengine',
     'api',
+    
+    # Cloud lưu ảnh
+    'cloudinary',
+    'cloudinary_storage',
 ]
+
+# settings.py
+import cloudinary
+
+cloudinary.config( 
+  cloud_name = "dze6buir3", 
+  api_key = "652542943279132", 
+  api_secret = "gzeC-JTXYAWpP3udjSDGw06C66A"
+)
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
