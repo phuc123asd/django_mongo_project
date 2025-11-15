@@ -15,7 +15,11 @@ def chatbot(request):
 
     data = json.loads(request.body)
     question = data.get("question", "")
-
+    
+    # Phân loại đây là nhóm khách hàng hay người quản trị
+    # do something
+    
+    
     # Sinh embedding cho câu hỏi
     emb = client.embeddings.create(
         model="text-embedding-3-small",
@@ -41,7 +45,8 @@ def chatbot(request):
                 "Nếu ngữ cảnh trống, hãy trả lời dựa trên kiến thức chung và khéo léo đề nghị khách hàng liên hệ để được tư vấn. "
                 "Luôn giữ văn phong thân thiện, chuyên nghiệp."},
             {"role": "user", "content": f"Câu hỏi: {question}\nDữ liệu sản phẩm:\n{context}"}
-        ]
+        ],
+        max_tokens=100,
     )
 
     answer = response.choices[0].message.content
