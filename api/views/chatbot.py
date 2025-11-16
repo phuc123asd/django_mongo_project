@@ -9,14 +9,44 @@ from api.json.decision import handle_admin_command
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 collection = db.get_collection("products_embeddings")
 
+# --- THÊM PROMPT MỚI CHO CÂU HỎI CHUNG ---
+GENERAL_CONVERSATION_PROMPT = """Bạn là một trợ lý ảo thân thiện và chuyên nghiệp cho Admin quản lý cửa hàng TechHub.
+Nhiệm vụ của bạn là trả lời các câu hỏi chung của admin một cách đầy đủ và hữu ích.
+Hãy giữ văn phong thân thiện, chuyên nghiệp và tự nhiên như một cuộc trò chuyện."""
+# -----------------------------------------
+
 @csrf_exempt
 def chatbot(request):
     if request.method != "POST":
         return JsonResponse({"error": "Only POST allowed"}, status=405)
 
-    data = json.loads(request.body)
-    question = data.get("question", "")
-    role = data.get("role", "")
+    # --- BẮT ĐẦU PHẦN SỬA ---
+    # Khởi tạo các biến
+    question = ""
+    role = ""
+    
+    # Kiểm tra xem request có chứa file không (Content-Type là multipart/form-data)
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        question = request.POST.get('question', '')
+        role = request.POST.get('role', '')
+        
+        # Lấy danh sách các file ảnh được gửi lên
+        uploaded_files = request.FILES.getlist('images')
+        
+        # Trích xuất tên các file và ghép vào cuối câu hỏi
+        # Ví dụ: "tôi muốn thêm iphone 17" + " 1.jpg 2.jpg" -> "tôi muốn thêm iphone 17 1.jpg 2.jpg"
+        if uploaded_files:
+            image_names = " " + " ".join([f.name for f in uploaded_files])
+            question += image_names
+            
+    else:
+        # Nếu không có file, đọc như JSON thông thường
+        try:
+            data = json.loads(request.body)
+            question = data.get("question", "")
+            role = data.get("role", "")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON payload"}, status=400)
     if role == 'user':
         # Sinh embedding cho câu hỏi
         emb = client.embeddings.create(
@@ -49,81 +79,89 @@ def chatbot(request):
         answer = response.choices[0].message.content
         return JsonResponse({"answer": answer})
     else:
-        system_prompt = """Bạn là một AI Agent dành cho Admin quản lý cửa hàng TechHub.
-            Nhiệm vụ của bạn:
-            1. Phân tích yêu cầu của admin.
-            2. Xác định hành động cần thực hiện.
-            3. Kiểm tra các thông tin bắt buộc cho từng hành động.
-            4. Nếu thiếu thông tin bắt buộc, trả về action = "none" với thông báo rõ ràng.
-            5. Luôn trả về DUY NHẤT JSON hợp lệ, không văn bản khác, định dạng:
-            {
-                "action": "add_product | update_product | delete_product | reply_feedback | approve_order | reject_order | get_order_status | none",
-                "payload": {}
+        command_extraction_prompt = """Bạn là một AI Agent chuyên trích xuất thông tin cho Admin quản lý cửa hàng TechHub.
+        Nhiệm vụ chính của bạn là phân tích câu lệnh của admin và trích xuất thông tin vào một cấu trúc JSON hợp lệ.
+
+        QUY TẮC BẮT BUỘC:
+        1. Ưu tiên hàng đầu là xác định đúng HÀNH ĐỘNG và TRÍCH XUẤT thông tin.
+        2. Chỉ trả về action = "none" nếu yêu cầu hoàn toàn không liên quan hoặc không thể xác định được hành động.
+        3. Hãy linh hoạt với các định dạng dữ liệu. Ví dụ: "122 đô" -> price: 122, "1.jpg 2.jpg" -> images: ["1.jpg", "2.jpg"].
+
+        CẤU TRÚC JSON TRẢ VỀ:
+        {
+            "action": "add_product | update_product | delete_product | reply_feedback | approve_order | reject_order | get_order_status | none",
+            "payload": {
+                // Thông tin trích xuất được sẽ nằm ở đây
             }
+        }
 
-            Quy tắc và ràng buộc:
-            1. Thêm sản phẩm mới → action = "add_product"
-               - Yêu cầu bắt buộc: tên sản phẩm, giá, ít nhất 4 URL ảnh
-               - Nếu thiếu thông tin bắt buộc → action = "none" với thông báo chi tiết
+        HƯỚNG DẪN CHI TIẾT CHO TỪNG HÀNH ĐỘNG:
 
-            2. Sửa sản phẩm → action = "update_product"
-               - Yêu cầu bắt buộc: ID sản phẩm, trường cần sửa, giá trị mới
-               - Nếu thiếu thông tin bắt buộc → action = "none" với thông báo chi tiết
+        1.  **add_product**: Khi admin muốn thêm sản phẩm.
+            - **Từ khóa**: "thêm", "tạo", "mới", "đưa vào db".
+            - **Trích xuất bắt buộc**:
+                - "name": Tên sản phẩm (ví dụ: "iphone 17").
+                - "price": Giá số (chỉ lấy số, ví dụ: từ "122 đô" lấy 122).
+                - "images": Mảng chứa các chuỗi ảnh. Nếu admin liệt kê "1.jpg 2.jpg 3.jpg 4.jpg", hãy chuyển thành ["1.jpg", "2.jpg", "3.jpg", "4.jpg"].
+            - **Ví dụ trích xuất thành công**:
+                - Input: "tôi muốn thêm 1 sản phẩm iphone 17 giá là 122 đô 1.jpg 2.jpg 3.jpg 4.jpg vào db"
+                - Output: {"action": "add_product", "payload": {"name": "iphone 17", "price": 122, "images": ["1.jpg", "2.jpg", "3.jpg", "4.jpg"]}}
 
-            3. Xóa sản phẩm → action = "delete_product"
-               - Yêu cầu bắt buộc: ID sản phẩm
-               - Nếu thiếu thông tin bắt buộc → action = "none" với thông báo chi tiết
+        2.  **update_product**: Khi admin muốn sửa thông tin sản phẩm.
+            - **Từ khóa**: "sửa", "cập nhật", "đổi", "update".
+            - **Trích xuất bắt buộc**:
+                - "product_id": ID hoặc tên sản phẩm cần sửa.
+                - "field": Trường cần sửa (ví dụ: "price", "name").
+                - "value": Giá trị mới.
 
-            4. Trả lời phản hồi khách → action = "reply_feedback"
-               - Yêu cầu bắt buộc: ID phản hồi, nội dung trả lời
-               - Nếu thiếu thông tin bắt buộc → action = "none" với thông báo chi tiết
+        3.  **delete_product**: Khi admin muốn xóa sản phẩm.
+            - **Từ khóa**: "xóa", "xoá", "delete", "remove".
+            - **Trích xuất bắt buộc**:
+                - "product_id": ID hoặc tên sản phẩm cần xóa.
 
-            5. Duyệt đơn → action = "approve_order"
-               - Yêu cầu bắt buộc: ID đơn hàng
-               - Nếu thiếu thông tin bắt buộc → action = "none" với thông báo chi tiết
+        4.  **reply_feedback**: Khi admin muốn trả lời phản hồi của khách.
+            - **Từ khóa**: "trả lời", "phản hồi", "reply feedback".
+            - **Trích xuất bắt buộc**:
+                - "feedback_id": ID của phản hồi.
+                - "reply": Nội dung trả lời.
 
-            6. Từ chối đơn → action = "reject_order"
-               - Yêu cầu bắt buộc: ID đơn hàng, lý do từ chối
-               - Nếu thiếu thông tin bắt buộc → action = "none" với thông báo chi tiết
+        5.  **approve_order**: Khi admin muốn duyệt đơn hàng.
+            - **Từ khóa**: "duyệt đơn", "chấp nhận đơn", "approve order".
+            - **Trích xuất bắt buộc**:
+                - "order_id": ID của đơn hàng.
 
-            7. Kiểm tra tình trạng đơn → action = "get_order_status"
-               - Yêu cầu bắt buộc: ID đơn hàng
-               - Nếu thiếu thông tin bắt buộc → action = "none" với thông báo chi tiết
+        6.  **reject_order**: Khi admin muốn từ chối đơn hàng.
+            - **Từ khóa**: "từ chối đơn", "hủy đơn", "reject order".
+            - **Trích xuất bắt buộc**:
+                - "order_id": ID của đơn hàng.
+                - "reason": Lý do từ chối (nếu có).
 
-            8. Nếu về nội dung khác → action = "none" với thông báo "Không hiểu yêu cầu, vui lòng thử lại"
+        7.  **get_order_status**: Khi admin muốn kiểm tra trạng thái đơn hàng.
+            - **Từ khóa**: "kiểm tra đơn", "trạng thái đơn", "order status".
+            - **Trích xuất bắt buộc**:
+                - "order_id": ID của đơn hàng.
 
-            QUY TRÌNH KIỂM TRA TRƯỚC KHI TRẢ VỀ:
-            1. Xác định action phù hợp.
-            2. Kiểm tra tất cả các thông tin bắt buộc cho action đó.
-            3. Nếu thiếu thông tin bắt buộc:
-               a. Xác định chính xác thông tin nào đang thiếu
-               b. Tạo thông báo rõ ràng cho admin về những gì cần cung cấp
-               c. Đặt action = "none" với payload chứa thông báo
-            4. Đảm bảo JSON hợp lệ và đầy đủ.
-            5. Chỉ trả về JSON, không thêm văn bản khác.
+        8.  **none**: Chỉ dùng khi không thể xác định được bất kỳ hành động nào ở trên.
+            - **Ví dụ**: Input: "chào buổi sáng" -> Output: {"action": "none", "payload": {"reason": "unknown_command", "message": "Yêu cầu không rõ ràng."}}
 
-            CẤU TRÚC KHI ACTION = "none":
-            Phải trả về một payload có cấu trúc để hệ thống có thể xử lý và hiển thị thông báo cho admin.
-            - Ví dụ 1: Thiếu thông tin khi thêm sản phẩm.
-            `{"action": "none", "payload": {"reason": "missing_required_info", "message": "Để thêm sản phẩm, vui lòng cung cấp: tên sản phẩm, giá và ít nhất 4 URL ảnh."}}`
-            - Ví dụ 2: Thiếu ID sản phẩm khi xóa.
-            `{"action": "none", "payload": {"reason": "missing_product_id", "message": "Để xóa sản phẩm, vui lòng cung cấp ID sản phẩm."}}`
-
-            LUÔN TUÂN THEO:
-            - Không viết văn bản ngoài JSON.
-            - Kiểm tra kỹ các thông tin bắt buộc trước khi trả về.
-            - Chỉ sử dụng các action đã liệt kê.
-            - Luôn giữ văn phong thân thiện, chuyên nghiệp.
-            """
+        LUÔN LUÔN TRẢ VỀ MỘT ĐỐI TƯỢNG JSON HỢP LỆ, KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO KHÁC.
+        """
         # Gửi sang GPT
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": command_extraction_prompt},
                 {"role": "user", "content": f"Câu hỏi: {question}"}
             ],
-            max_tokens=200,
+            max_tokens=500, # Tăng lên để đủ không gian cho JSON
+            temperature=0,
         )
+        
         answer = response.choices[0].message.content
-        handle_admin_command(answer)
-        return JsonResponse({"answer": "Trả về kết quả thành công"})
+        print(f"Phản hồi thô từ AI: {answer}")
+        
+        # Gọi hàm xử lý và nhận kết quả
+        result = handle_admin_command(answer)
+        
+        # Trả về kết quả thực tế cho frontend
+        return JsonResponse(result)

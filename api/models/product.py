@@ -20,8 +20,4 @@ class Product(Document):
 
 
     def __str__(self):
-        """
-        Phương thức để hiển thị đối tượng Product dưới dạng chuỗi dễ đọc.
-        Ví dụ: <Product: iPhone 15 Pro>
-        """
         return f"<Product: {self.name}>"

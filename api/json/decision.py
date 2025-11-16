@@ -3,16 +3,8 @@ import json
 def handle_admin_command(ai_response_string):
     try:
         action_data = json.loads(ai_response_string)
+        print(f"✅ Phân tích JSON thành công: {action_data}")
 
-        # Bước 2: Xử lý trường hợp phản hồi không đầy đủ (VD: {"action": "none"})
-        if action_data.get("action") == "none" and "payload" not in action_data:
-            print("⚠️ Cảnh báo: AI trả về action 'none' nhưng thiếu payload. Tự động thêm payload mặc định.")
-            action_data["payload"] = {
-                "reason": "incomplete_response",
-                "message": "AI Agent đã trả về một phản hồi không đầy đủ. Vui lòng thử lại với yêu cầu rõ ràng hơn."
-            }
-
-        # Bước 3: Switch Case để xử lý hành động
         action = action_data.get("action")
         payload = action_data.get("payload", {})
 
@@ -20,67 +12,38 @@ def handle_admin_command(ai_response_string):
             print(f"🚀 HÀNH ĐỘNG: THÊM SẢN PHẨM MỚI")
             print(f"   - Dữ liệu payload: {payload}")
             # TODO: Gọi hàm thêm sản phẩm vào database của bạn ở đây
-            # result = products_service.add_product(payload)
-            # return JsonResponse({"success": True, "result": result})
+            # Trả về thông báo thành công cho frontend
+            return {
+                "success": True, 
+                "action": action, 
+                "message": f"Đã nhận yêu cầu thêm sản phẩm '{payload.get('name', 'không xác định')}' với giá ${payload.get('price', 0)}."
+            }
 
         elif action == "update_product":
             print(f"✏️ HÀNH ĐỘNG: CẬP NHẬT SẢN PHẨM")
             print(f"   - Dữ liệu payload: {payload}")
-            # TODO: Gọi hàm cập nhật sản phẩm
-            # result = products_service.update_product(payload)
-            # return JsonResponse({"success": True, "result": result})
+            return {
+                "success": True, 
+                "action": action, 
+                "message": f"Đã nhận yêu cầu cập nhật sản phẩm '{payload.get('product_id', 'không xác định')}'."
+            }
 
-        elif action == "delete_product":
-            print(f"🗑️ HÀNH ĐỘNG: XÓA SẢN PHẨM")
-            print(f"   - Dữ liệu payload: {payload}")
-            # TODO: Gọi hàm xóa sản phẩm
-            # result = products_service.delete_product(payload)
-            # return JsonResponse({"success": True, "result": result})
-
-        elif action == "reply_feedback":
-            print(f"💬 HÀNH ĐỘNG: TRẢ LỜI PHẢN HỒI")
-            print(f"   - Dữ liệu payload: {payload}")
-            # TODO: Gọi hàm trả lời phản hồi
-            # result = feedback_service.reply(payload)
-            # return JsonResponse({"success": True, "result": result})
-
-        elif action == "approve_order":
-            print(f"✅ HÀNH ĐỘNG: DUYỆT ĐƠN HÀNG")
-            print(f"   - Dữ liệu payload: {payload}")
-            # TODO: Gọi hàm duyệt đơn
-            # result = order_service.approve(payload)
-            # return JsonResponse({"success": True, "result": result})
-
-        elif action == "reject_order":
-            print(f"❌ HÀNH ĐỘNG: TỪ CHỐI ĐƠN HÀNG")
-            print(f"   - Dữ liệu payload: {payload}")
-            # TODO: Gọi hàm từ chối đơn
-            # result = order_service.reject(payload)
-            # return JsonResponse({"success": True, "result": result})
-
-        elif action == "get_order_status":
-            print(f"🔍 HÀNH ĐỘNG: KIỂM TRA TÌNH TRẠNG ĐƠN HÀNG")
-            print(f"   - Dữ liệu payload: {payload}")
-            # TODO: Gọi hàm kiểm tra trạng thái
-            # result = order_service.get_status(payload)
-            # return JsonResponse({"success": True, "result": result})
-
+        # ... (làm tương tự cho các action khác) ...
         elif action == "none":
             # Đây là trường hợp quan trọng nhất để thông báo lỗi cho admin
-            reason = payload.get("reason", "unknown")
             message = payload.get("message", "Đã xảy ra lỗi không xác định.")
             print(f"🛑 HÀNH ĐỘNG: KHÔNG THỰC HIỆN (NONE)")
-            print(f"   - Lý do: {reason}")
             print(f"   - Thông báo cho Admin: {message}")
             # Trả về lỗi cho frontend để hiển thị
+            return {"success": False, "action": action, "error": message}
 
         else:
-            # Xử lý nếu AI trả về một action không nằm trong danh sách
             print(f"❓ HÀNH ĐỘNG KHÔNG HỢP LỆ: '{action}'")
+            return {"success": False, "action": "none", "error": f"Hành động không hợp lệ: {action}"}
 
     except json.JSONDecodeError:
-        # Xử lý nếu AI không trả về JSON hợp lệ
         print(f"🚨 LỖI: Không thể phân tích JSON từ AI. Phản hồi nhận được: '{ai_response_string}'")
+        return {"success": False, "action": "none", "error": "Phản hồi từ AI không hợp lệ."}
     except Exception as e:
-        # Bắt các lỗi khác
         print(f"🚨 LỖI KHÔNG XÁC ĐỊNH: {e}")
+        return {"success": False, "action": "none", "error": "Đã xảy ra lỗi máy chủ."}
