@@ -20,7 +20,6 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Cho phép truy cập từ các host này
-# ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv())
 ALLOWED_HOSTS = ['*']
 
 # Đọc các API Key
