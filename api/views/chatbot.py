@@ -162,6 +162,23 @@ def chatbot(request):
         
         # Gọi hàm xử lý và nhận kết quả
         result = handle_admin_command(answer)
-        
-        # Trả về kết quả thực tế cho frontend
+
+        # --- THÊM PHẦN CẢI TIẾN Ở ĐÂY ---
+        if result.get("action") == "none":
+            # Khi không phải lệnh admin → trả lời trò chuyện tự nhiên
+            conv_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": GENERAL_CONVERSATION_PROMPT},
+                    {"role": "user", "content": question}
+                ],
+                max_tokens=250,
+                temperature=0.8,
+            )
+            natural_answer = conv_response.choices[0].message.content
+            return JsonResponse({
+                "success": True,
+                "action": "general_chat",
+                "answer": natural_answer
+            })
         return JsonResponse(result)
