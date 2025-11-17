@@ -38,6 +38,7 @@ local_settings.py
 Thumbs.db
 
 # === Environment / Secrets ===
+.env
 *.secret
 *.key
 secrets.json
