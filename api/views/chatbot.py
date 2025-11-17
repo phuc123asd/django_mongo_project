@@ -9,28 +9,22 @@ from api.json.decision import handle_admin_command
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 collection = db.get_collection("products_embeddings")
 
-# --- THÊM PROMPT MỚI CHO CÂU HỎI CHUNG ---
 GENERAL_CONVERSATION_PROMPT = """Bạn là một trợ lý ảo thân thiện và chuyên nghiệp cho Admin quản lý cửa hàng TechHub.
 Nhiệm vụ của bạn là trả lời các câu hỏi chung của admin một cách đầy đủ và hữu ích.
 Hãy giữ văn phong thân thiện, chuyên nghiệp và tự nhiên như một cuộc trò chuyện."""
-# -----------------------------------------
 
 @csrf_exempt
 def chatbot(request):
     if request.method != "POST":
         return JsonResponse({"error": "Only POST allowed"}, status=405)
 
-    # --- BẮT ĐẦU PHẦN SỬA ---
-    # Khởi tạo các biến
     question = ""
     role = ""
     
-    # Kiểm tra xem request có chứa file không (Content-Type là multipart/form-data)
     if request.content_type and 'multipart/form-data' in request.content_type:
         question = request.POST.get('question', '')
         role = request.POST.get('role', '')
         
-        # Lấy danh sách các file ảnh được gửi lên
         uploaded_files = request.FILES.getlist('images')
         
         # Trích xuất tên các file và ghép vào cuối câu hỏi
@@ -80,12 +74,11 @@ def chatbot(request):
         return JsonResponse({"answer": answer})
     else:
         command_extraction_prompt = """Bạn là một AI Agent chuyên trích xuất thông tin cho Admin quản lý cửa hàng TechHub.
-        Nhiệm vụ chính của bạn là phân tích câu lệnh của admin và trích xuất thông tin vào một cấu trúc JSON hợp lệ.
-
         QUY TẮC BẮT BUỘC:
-        1. Ưu tiên hàng đầu là xác định đúng HÀNH ĐỘNG và TRÍCH XUẤT thông tin.
-        2. Chỉ trả về action = "none" nếu yêu cầu hoàn toàn không liên quan hoặc không thể xác định được hành động.
-        3. Hãy linh hoạt với các định dạng dữ liệu. Ví dụ: "122 đô" -> price: 122, "1.jpg 2.jpg" -> images: ["1.jpg", "2.jpg"].
+        1. NHIỆM VỤ CỦA BẠN LÀ PHÂN TÍCH VÀ TRÍCH XUẤT THÔNG TIN, KHÔNG PHẢI TRẢ LỜI TƯ VẤN.
+        2. Ưu tiên hàng đầu là xác định đúng HÀNH ĐỘNG và tạo ra JSON tương ứng.
+        3. Chỉ trả về action = "none" nếu yêu cầu hoàn toàn không liên quan đến bất kỳ hành động quản trị nào.
+        4. Hãy linh hoạt với các định dạng dữ liệu. Ví dụ: "122 đô" -> price: 122, "1.jpg 2.jpg" -> images: ["1.jpg", "2.jpg"].
 
         CẤU TRÚC JSON TRẢ VỀ:
         {
@@ -94,18 +87,21 @@ def chatbot(request):
                 // Thông tin trích xuất được sẽ nằm ở đây
             }
         }
-
         HƯỚNG DẪN CHI TIẾT CHO TỪNG HÀNH ĐỘNG:
-
         1.  **add_product**: Khi admin muốn thêm sản phẩm.
             - **Từ khóa**: "thêm", "tạo", "mới", "đưa vào db".
-            - **Trích xuất bắt buộc**:
+            - **NHIỆM VỤ CỦA BẠN**: PHẢI trích xuất thông tin và tạo JSON. KHÔNG được trả lời câu hỏi hay yêu cầu cung cấp thêm thông tin.
+            - **Trích xuất BẮT BUỘC**:
                 - "name": Tên sản phẩm (ví dụ: "iphone 17").
                 - "price": Giá số (chỉ lấy số, ví dụ: từ "122 đô" lấy 122).
                 - "images": Mảng chứa các chuỗi ảnh. Nếu admin liệt kê "1.jpg 2.jpg 3.jpg 4.jpg", hãy chuyển thành ["1.jpg", "2.jpg", "3.jpg", "4.jpg"].
+            - **Nếu THIẾU thông tin**: Vẫn tạo JSON với action "add_product". Trong payload, điền các thông tin có thể trích xuất. Các trường bắt buộc bị thiếu sẽ được xử lý bởi hệ thống. KHÔNG được báo lỗi hoặc yêu cầu thêm thông tin trong JSON này.
             - **Ví dụ trích xuất thành công**:
                 - Input: "tôi muốn thêm 1 sản phẩm iphone 17 giá là 122 đô 1.jpg 2.jpg 3.jpg 4.jpg vào db"
                 - Output: {"action": "add_product", "payload": {"name": "iphone 17", "price": 122, "images": ["1.jpg", "2.jpg", "3.jpg", "4.jpg"]}}
+            - **Ví dụ khi THIẾU thông tin**:
+                - Input: "thêm iphone 17 vào db"
+                - Output: {"action": "add_product", "payload": {"name": "iphone 17", "price": null, "images": []}}
 
         2.  **update_product**: Khi admin muốn sửa thông tin sản phẩm.
             - **Từ khóa**: "sửa", "cập nhật", "đổi", "update".
@@ -129,21 +125,17 @@ def chatbot(request):
             - **Từ khóa**: "duyệt đơn", "chấp nhận đơn", "approve order".
             - **Trích xuất bắt buộc**:
                 - "order_id": ID của đơn hàng.
-
         6.  **reject_order**: Khi admin muốn từ chối đơn hàng.
             - **Từ khóa**: "từ chối đơn", "hủy đơn", "reject order".
             - **Trích xuất bắt buộc**:
                 - "order_id": ID của đơn hàng.
                 - "reason": Lý do từ chối (nếu có).
-
         7.  **get_order_status**: Khi admin muốn kiểm tra trạng thái đơn hàng.
             - **Từ khóa**: "kiểm tra đơn", "trạng thái đơn", "order status".
             - **Trích xuất bắt buộc**:
                 - "order_id": ID của đơn hàng.
-
         8.  **none**: Chỉ dùng khi không thể xác định được bất kỳ hành động nào ở trên.
             - **Ví dụ**: Input: "chào buổi sáng" -> Output: {"action": "none", "payload": {"reason": "unknown_command", "message": "Yêu cầu không rõ ràng."}}
-
         LUÔN LUÔN TRẢ VỀ MỘT ĐỐI TƯỢNG JSON HỢP LỆ, KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO KHÁC.
         """
         # Gửi sang GPT
