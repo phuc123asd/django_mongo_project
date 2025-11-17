@@ -4,57 +4,63 @@ from mongoengine.errors import ValidationError, NotUniqueError
 
 def add_product(payload):
     """
-    Thêm một sản phẩm mới và chi tiết của nó vào MongoDB.
+    Hàm này nhận payload đã có đầy đủ thông tin từ GPT và lưu vào DB.
     """
     try:
         # 1. Trích xuất dữ liệu từ payload
         name = payload.get('name')
         price = payload.get('price')
-        original_price = payload.get('originalPrice') # Không bắt buộc
-        image_names = payload.get('images', []) # Lấy danh sách tên ảnh
-
-        # 2. Xử lý ảnh (Đây là phần quan trọng)
-        # Giả sử: bạn có một hàm để upload file và trả về URL
-        # Hiện tại, chúng ta sẽ tạo URL giả lập cho mục đích demo
-        # !!! QUAN TRỌNG: Thay 'http://your-image-domain.com/' bằng domain lưu trữ ảnh của bạn
-        if not image_names:
+        original_price = payload.get('originalPrice')
+        
+        # 2. Lấy danh sách URL ảnh từ payload (đã được GPT trích xuất)
+        image_urls = payload.get('images', [])
+        
+        if not image_urls:
             return {
                 "success": False,
                 "error": "Vui lòng cung cấp ít nhất một hình ảnh cho sản phẩm."
             }
         
-        # Lấy ảnh đầu tiên làm ảnh chính cho model Product
-        main_image_name = image_names[0]
-        main_image_url = f"http://your-image-domain.com/{main_image_name}"
+        # Lấy ảnh đầu tiên làm ảnh chính
+        main_image_url = image_urls[0]
         
-        # Chuyển tất cả các tên ảnh thành URL cho model ProductDetail
-        image_urls = [f"http://your-image-domain.com/{img_name}" for img_name in image_names]
-
-        # 3. Tạo và lưu đối tượng Product
+        # 3. Tạo và lưu đối tượng Product với đầy đủ thông tin
         product = Product(
             name=name,
             price=price,
             originalPrice=original_price,
             image=main_image_url,
-            # Các trường khác có thể được thêm vào ở đây hoặc để AI suy luận
-            # Ví dụ: category="Smartphones", brand="Apple", isNew=True
+            # Sử dụng các thông tin do GPT suy luận
+            category=payload.get('category'),
+            brand=payload.get('brand'),
+            rating=payload.get('rating', 4.5),
+            isNew=payload.get('isNew', True)
         )
         product.save()
-
-        # 4. Tạo và lưu đối tượng ProductDetail liên kết
+        
+        # 4. Tạo và lưu đối tượng ProductDetail
         product_detail = ProductDetail(
-            product=product, # Liên kết với sản phẩm vừa tạo
+            product=product,
             images=image_urls,
-            # Các trường khác có thể được thêm vào
+            rating=payload.get('rating', 4.5),
+            reviewCount=payload.get('reviewCount', 0),
+            description=payload.get('description'),
+            features=payload.get('features', []),
+            specifications=payload.get('specifications', {}),
+            inStock=payload.get('inStock', True),
+            hasARView=payload.get('hasARView', False)
         )
         product_detail.save()
-
+        
+        # 5. Trả về kết quả thành công, bao gồm cả danh sách URL ảnh
         return {
             "success": True,
+            "action": "add_product",
             "message": f"Đã thêm sản phẩm '{name}' thành công.",
-            "product_id": str(product.id) # Trả về ID của sản phẩm mới
+            "product_id": str(product.id),
+            "images": image_urls  # <-- Trả về để frontend hiển thị
         }
-
+        
     except ValidationError as e:
         return {
             "success": False,

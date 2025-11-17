@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from api.utils.astra_client import db
 from django.conf import settings
 from api.json.decision import handle_admin_command
+import cloudinary.uploader
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 collection = db.get_collection("products_embeddings")
@@ -26,13 +27,23 @@ def chatbot(request):
         role = request.POST.get('role', '')
         
         uploaded_files = request.FILES.getlist('images')
-        
-        # Trích xuất tên các file và ghép vào cuối câu hỏi
-        # Ví dụ: "tôi muốn thêm iphone 17" + " 1.jpg 2.jpg" -> "tôi muốn thêm iphone 17 1.jpg 2.jpg"
+
         if uploaded_files:
-            image_names = " " + " ".join([f.name for f in uploaded_files])
-            question += image_names
-            
+            print(f"Đã nhận được {len(uploaded_files)} file ảnh. Bắt đầu upload lên Cloudinary...")
+        
+            for file in uploaded_files:
+                try:
+                    # Upload file lên Cloudinary
+                    upload_result = cloudinary.uploader.upload(file)
+                    # Lấy URL an toàn (secure_url) từ kết quả
+                    image_url = upload_result['secure_url']
+                    # In URL ra console để kiểm tra
+                    print(f"  - Upload thành công file '{file.name}'. URL: {image_url}")
+                    # Thêm URL vào danh sách để sử dụng sau
+                    question += " " + image_url + " "
+                except Exception as e:
+                    # In ra lỗi nếu có
+                    print(f"  - Lỗi khi upload file '{file.name}': {e}")
     else:
         # Nếu không có file, đọc như JSON thông thường
         try:
@@ -90,19 +101,23 @@ def chatbot(request):
         HƯỚNG DẪN CHI TIẾT CHO TỪNG HÀNH ĐỘNG:
         1.  **add_product**: Khi admin muốn thêm sản phẩm.
             - **Từ khóa**: "thêm", "tạo", "mới", "đưa vào db".
-            - **NHIỆM VỤ CỦA BẠN**: PHẢI trích xuất thông tin và tạo JSON. KHÔNG được trả lời câu hỏi hay yêu cầu cung cấp thêm thông tin.
-            - **Trích xuất BẮT BUỘC**:
-                - "name": Tên sản phẩm (ví dụ: "iphone 17").
-                - "price": Giá số (chỉ lấy số, ví dụ: từ "122 đô" lấy 122).
-                - "images": Mảng chứa các chuỗi ảnh. Nếu admin liệt kê "1.jpg 2.jpg 3.jpg 4.jpg", hãy chuyển thành ["1.jpg", "2.jpg", "3.jpg", "4.jpg"].
-            - **Nếu THIẾU thông tin**: Vẫn tạo JSON với action "add_product". Trong payload, điền các thông tin có thể trích xuất. Các trường bắt buộc bị thiếu sẽ được xử lý bởi hệ thống. KHÔNG được báo lỗi hoặc yêu cầu thêm thông tin trong JSON này.
-            - **Ví dụ trích xuất thành công**:
-                - Input: "tôi muốn thêm 1 sản phẩm iphone 17 giá là 122 đô 1.jpg 2.jpg 3.jpg 4.jpg vào db"
-                - Output: {"action": "add_product", "payload": {"name": "iphone 17", "price": 122, "images": ["1.jpg", "2.jpg", "3.jpg", "4.jpg"]}}
-            - **Ví dụ khi THIẾU thông tin**:
-                - Input: "thêm iphone 17 vào db"
-                - Output: {"action": "add_product", "payload": {"name": "iphone 17", "price": null, "images": []}}
-
+            - **NHIỆM VỤ CỦA BẠN**: Trích xuất thông tin và tạo JSON. KHÔNG trả lời câu hỏi hay yêu cầu cung cấp thêm thông tin.
+            - **Trích xuất BẮT BUỘC (Phải có trong input của admin)**:
+                - "name": Tên sản phẩm.
+                - "price": Giá số (chỉ lấy số).
+                - "images": Mảng chứa các URL đầy đủ của ảnh. Nếu admin liệt kê "https://res.cloudinary.com/dze6buir3....", hãy chuyển thành ["https://res.cloudinary.com/dze6buir..."].
+            - **Suy luận TỰ ĐỘNG các trường khác (Dựa trên ngữ cảnh và tên sản phẩm)**:
+                - "originalPrice": Nếu không có thông tin giảm giá, suy luận giá gốc cao hơn giá bán khoảng 10-20%. Nếu có vẻ là sản phẩm mới ra mắt không giảm giá, có thể bằng với `price` hoặc `null`.
+                - "category": Xác định dựa trên tên sản phẩm gồm có("Smartphones", "Laptops", "Audio", "Smartwatches", "Tablets", "Gaming", "Drones", "Accessories").
+                - "brand": Xác định dựa trên tên sản phẩm gồm có("Apple", "Samsung", "Dell", "Microsoft", "Nintendo", "DJI", "Logitech", "Canon", "GoPro", "Fitbit", "Razer", "HP", "Bose", "Google", "Asus", "Lenovo", "Xiaomi", "OnePlus", "Drones").
+                - "rating": Sản phẩm cao cấp, thương hiệu lớn thường có rating cao (4.5-5.0). Sản phẩm tầm trung thấp hơn (3.5-4.5).
+                - "isNew": Nếu tên sản phẩm có số phiên bản cao nhất hoặc có từ "pro", "max", "new" thì là `true`. Ngược lại là `false`.
+                - "description": Viết một mô tả ngắn (1-2 câu) hấp dẫn về sản phẩm dựa trên tên và các đặc điểm đã suy luận.
+                - "features": Tạo một mảng 3-5 tính năng nổi bật nhất của loại sản phẩm đó.
+                - "specifications": Tạo một đối tượng chứa các thông số kỹ thuật quan trọng và phù hợp với loại sản phẩm.
+                - "reviewCount": Sản phẩm mới thường có ít đánh giá (0-50). Sản phẩm phổ biến có nhiều hơn (100+).
+                - "inStock": Thường là `true` trừ khi có dấu hiệu cho thấy hết hàng.
+                - "hasARView": Các sản phẩm công nghệ cao, đắt tiền (đặc biệt là của Apple, Samsung) thường có tính năng này.
         2.  **update_product**: Khi admin muốn sửa thông tin sản phẩm.
             - **Từ khóa**: "sửa", "cập nhật", "đổi", "update".
             - **Trích xuất bắt buộc**:
