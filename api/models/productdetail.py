@@ -9,7 +9,7 @@ class ProductDetail(Document):
     meta = {'collection': 'productdetails'}
 
     # Liên kết 1–1 với Product
-    product = fields.ReferenceField('Product', required=True, unique=True)
+    product = fields.ReferenceField('Product', required=True, unique=True, reverse_delete_rule=CASCADE)
 
 
     # Trường chính

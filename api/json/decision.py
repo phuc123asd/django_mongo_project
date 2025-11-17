@@ -1,5 +1,6 @@
 import json
-from api.services.product_service import add_product
+from api.services.product_service import *
+from api.services.order_service import *
 
 def handle_admin_command(ai_response_string):
     try:
@@ -39,13 +40,38 @@ def handle_admin_command(ai_response_string):
         elif action == "update_product":
             print(f"✏️ HÀNH ĐỘNG: CẬP NHẬT SẢN PHẨM")
             print(f"   - Dữ liệu payload: {payload}")
-            # --- SỬA LỖI: Trả về kết quả thay vì `pass` ---
-            return {
-                "success": True, 
-                "action": action, 
-                "message": f"Đã nhận yêu cầu cập nhật sản phẩm '{payload.get('product_id', 'không xác định')}'."
-            }
+            # Gọi hàm update_product để thực hiện cập nhật
+            return update_product(payload)
+        
+        elif action == "delete_product":
+            print(f"🗑️ HÀNH ĐỘNG: XÓA SẢN PHẨM")
+            print(f"   - Dữ liệu payload từ AI: {payload}")
             
+            # Bắt buộc phải có product_id
+            product_id = payload.get("product_id")
+
+            if not product_id:
+                error_message = "Để xóa sản phẩm, vui lòng cung cấp ID hoặc tên sản phẩm."
+                print(f"   - Thông báo lỗi: {error_message}")
+                return {
+                    "success": False,
+                    "action": "delete_product",
+                    "error": error_message
+                }
+
+            # Nếu có product_id, gọi hàm delete_product để thực hiện
+            print(f"   - product_id hợp lệ, tiến hành gọi hàm delete_product...")
+            return delete_product(product_id)
+        
+        elif action == "approve_order":
+            print(f"✅ HÀNH ĐỘNG: DUYỆT ĐƠN HÀNG")
+            print(f"   - Dữ liệu payload: {payload}")
+            
+            # Lấy danh sách order_id từ payload
+            order_ids = payload.get("order_ids", [])
+            
+            # Gọi hàm approve_multiple_orders để xử lý
+            return approve_multiple_orders(order_ids)
         
         elif action == "none":
             # Đây là trường hợp quan trọng nhất để thông báo lỗi cho admin

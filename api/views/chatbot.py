@@ -93,7 +93,7 @@ def chatbot(request):
 
         CẤU TRÚC JSON TRẢ VỀ:
         {
-            "action": "add_product | update_product | delete_product | reply_feedback | approve_order | reject_order | get_order_status | none",
+            "action": "add_product | update_product | delete_product | approve_order | reject_order | get_order_status | none",
             "payload": {
                 // Thông tin trích xuất được sẽ nằm ở đây
             }
@@ -118,38 +118,88 @@ def chatbot(request):
                 - "reviewCount": Sản phẩm mới thường có ít đánh giá (0-50). Sản phẩm phổ biến có nhiều hơn (100+).
                 - "inStock": Thường là `true` trừ khi có dấu hiệu cho thấy hết hàng.
                 - "hasARView": Các sản phẩm công nghệ cao, đắt tiền (đặc biệt là của Apple, Samsung) thường có tính năng này.
-        2.  **update_product**: Khi admin muốn sửa thông tin sản phẩm.
-            - **Từ khóa**: "sửa", "cập nhật", "đổi", "update".
-            - **Trích xuất bắt buộc**:
-                - "product_id": ID hoặc tên sản phẩm cần sửa.
-                - "field": Trường cần sửa (ví dụ: "price", "name").
-                - "value": Giá trị mới.
+        2. **update_product**: Khi admin muốn CẬP NHẬT hoặc THAY ĐỔI thông tin sản phẩm.
+            - **Từ khóa**: "sửa", "cập nhật", "đổi", "update", "thay đổi", "chỉnh sửa", "sửa lại", "cập nhật lại", "đổi thành", "thiết lập lại", "giảm giá", "tăng giá".
+            
+            - **Trích xuất BẮT BUỘC**:
+                - "product_id": Tên hoặc ID của sản phẩm cần cập nhật.
+                - **ÍT NHẤT MỘT TRONG CÁC TRƯỜNG DƯỚI ĐÂY**:
+                    - "name": Tên mới của sản phẩm
+                    - "price": Giá mới
+                    - "originalPrice": Giá gốc mới
+                    - "image": URL ảnh chính mới
+                    - "images": Mảng URL ảnh mới
+                    - "category": Danh mục mới
+                    - "brand": Thương hiệu mới
+                    - "rating": Đánh giá mới
+                    - "isNew": Trạng thái mới (true/false)
+                    - "description": Mô tả mới
+                    - "features": Mảng tính năng mới
+                    - "specifications": Đối tượng thông số kỹ thuật mới
+                    - "inStock": Trạng thái tồn kho (true/false)
+                    - "hasARView": Tính năng AR (true/false)
+                    - "reviewCount": Số lượng đánh giá mới
+            
+            - **VÍ DỤ CỤ THỂ**:
+                - Input: "Sửa giá iPhone 15 Pro thành 1200"
+                - Output: {"action": "update_product", "payload": {"product_id": "iPhone 15 Pro", "price": 1200}}
+                
+                - Input: "Cập nhật lại giá gốc của Samsung Galaxy S24 thành 1400 và giá bán là 1200"
+                - Output: {"action": "update_product", "payload": {"product_id": "Samsung Galaxy S24", "originalPrice": 1400, "price": 1200}}
+                
+                - Input: "Đổi tên Dell XPS 13 thành Dell XPS 13 Plus và cập nhật mô tả là 'Laptop ultrabook mạnh mẽ'"
+                - Output: {"action": "update_product", "payload": {"product_id": "Dell XPS 13", "name": "Dell XPS 13 Plus", "description": "Laptop ultrabook mạnh mẽ"}}
+                
+                - Input: "Giảm giá iPad Air xuống 500 và đánh giá 4.8 sao"
+                - Output: {"action": "update_product", "payload": {"product_id": "iPad Air", "price": 500, "rating": 4.8}}
+                
+                - Input: "Cập nhật thông số kỹ thuật cho Sony WH-1000XM5: pin 30 giờ, chống ồn ANC"
+                - Output: {"action": "update_product", "payload": {"product_id": "Sony WH-1000XM5", "specifications": {"pin": "30 giờ", "chống_ồn": "ANC"}}}
+                
+                - Input: "Thêm ảnh mới cho MacBook Pro: https://example.com/img1.jpg, https://example.com/img2.jpg"
+                - Output: {"action": "update_product", "payload": {"product_id": "MacBook Pro", "images": ["https://example.com/img1.jpg", "https://example.com/img2.jpg"]}}
+                
+                - Input: "Đánh dấu iPhone 14 là không còn hàng"
+                - Output: {"action": "update_product", "payload": {"product_id": "iPhone 14", "inStock": false}}
+                
+                - Input: "Cập nhật tính năng cho Apple Watch Series 9: ['Theo dõi oxy máu', 'GPS', 'Chống nước 50m']"
+                - Output: {"action": "update_product", "payload": {"product_id": "Apple Watch Series 9", "features": ["Theo dõi oxy máu", "GPS", "Chống nước 50m"]}}
+            
+            - **LƯU Ý QUAN TRỌNG**:
+                - Luôn xác định đúng sản phẩm cần cập nhật dựa trên tên hoặc ID
+                - Có thể cập nhật nhiều trường cùng lúc
+                - Nếu admin nói "giảm giá" hoặc "tăng giá" mà không nói giá cụ thể, hãy hỏi giá mới
+                - Với thông số kỹ thuật, tạo đối tượng với các cặp key-value phù hợp
 
         3.  **delete_product**: Khi admin muốn xóa sản phẩm.
             - **Từ khóa**: "xóa", "delete", "remove".
             - **Trích xuất bắt buộc**:
-                - "product_id": ID hoặc tên sản phẩm cần xóa.
+                - "product_id": ID (Nếu thiếu thì yêu cầu người dung bổ sung)
 
-        4.  **reply_feedback**: Khi admin muốn trả lời phản hồi của khách.
-            - **Từ khóa**: "trả lời", "phản hồi", "reply feedback".
+        4.  **approve_order**: Khi admin muốn duyệt đơn hàng.
+            - **Từ khóa**: "duyệt đơn", "chấp nhận đơn", "approve order", "duyệt nhiều đơn", "duyệt tất cả đơn".
             - **Trích xuất bắt buộc**:
-                - "feedback_id": ID của phản hồi.
-                - "reply": Nội dung trả lời.
-
-        5.  **approve_order**: Khi admin muốn duyệt đơn hàng.
-            - **Từ khóa**: "duyệt đơn", "chấp nhận đơn", "approve order".
-            - **Trích xuất bắt buộc**:
-                - "order_id": ID của đơn hàng.
-        6.  **reject_order**: Khi admin muốn từ chối đơn hàng.
+                - "order_ids": Mảng chứa các ID của đơn hàng cần duyệt. Nếu admin nói "duyệt tất cả", hãy đặt mảng này là rỗng [].
+            
+            - **VÍ DỤ CỤ THỂ**:
+                - Input: "Duyệt đơn 12345"
+                - Output: {"action": "approve_order", "payload": {"order_ids": ["12345"]}}
+                
+                - Input: "Duyệt các đơn 12345, 67890, 54321"
+                - Output: {"action": "approve_order", "payload": {"order_ids": ["12345", "67890", "54321"]}}
+                
+                - Input: "Duyệt tất cả đơn hàng đang chờ"
+                - Output: {"action": "approve_order", "payload": {"order_ids": []}}
+        5.  **reject_order**: Khi admin muốn từ chối đơn hàng.
             - **Từ khóa**: "từ chối đơn", "hủy đơn", "reject order".
             - **Trích xuất bắt buộc**:
                 - "order_id": ID của đơn hàng.
                 - "reason": Lý do từ chối (nếu có).
-        7.  **get_order_status**: Khi admin muốn kiểm tra trạng thái đơn hàng.
+        6.  **get_order_status**: Khi admin muốn kiểm tra trạng thái đơn hàng.
             - **Từ khóa**: "kiểm tra đơn", "trạng thái đơn", "order status".
             - **Trích xuất bắt buộc**:
                 - "order_id": ID của đơn hàng.
-        8.  **none**: Chỉ dùng khi không thể xác định được bất kỳ hành động nào ở trên.
+        7.  **none**: Chỉ dùng khi không thể xác định được bất kỳ hành động nào ở trên.
             - **Ví dụ**: Input: "chào buổi sáng" -> Output: {"action": "none", "payload": {"reason": "unknown_command", "message": "Yêu cầu không rõ ràng."}}
         LUÔN LUÔN TRẢ VỀ MỘT ĐỐI TƯỢNG JSON HỢP LỆ, KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO KHÁC.
         """

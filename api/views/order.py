@@ -167,3 +167,25 @@ def create_order(request):
     
     # Nếu dữ liệu không hợp lệ, trả về lỗi 400
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def get_all_orders(request):
+    """
+    API endpoint để lấy danh sách tất cả các đơn hàng.
+    CẢNH BÁO: View này KHÔNG YÊU CẦU XÁC THỰC.
+    Sắp xếp theo ngày tạo mới nhất.
+    """
+    try:
+        # Lấy tất cả các đơn hàng, sắp xếp theo ngày tạo mới nhất
+        orders = Order.objects.all().order_by('-created_at')
+        
+        # Sử dụng many=True vì chúng ta đang serialize một danh sách các đối tượng
+        serializer = OrderSerializer(orders, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
