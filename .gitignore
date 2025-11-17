@@ -8,8 +8,6 @@ __pycache__/
 
 # Virtual environment
 venv/
-env/
-ENV/
 .venv/
 
 # === Django ===
@@ -40,8 +38,6 @@ local_settings.py
 Thumbs.db
 
 # === Environment / Secrets ===
-.env
-.env.*
 *.secret
 *.key
 secrets.json
