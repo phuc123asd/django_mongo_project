@@ -111,7 +111,7 @@ def chatbot(request):
                 - "category": Xác định dựa trên tên sản phẩm gồm có("Smartphones", "Laptops", "Audio", "Smartwatches", "Tablets", "Gaming", "Drones", "Accessories").
                 - "brand": Xác định dựa trên tên sản phẩm gồm có("Apple", "Samsung", "Dell", "Microsoft", "Nintendo", "DJI", "Logitech", "Canon", "GoPro", "Fitbit", "Razer", "HP", "Bose", "Google", "Asus", "Lenovo", "Xiaomi", "OnePlus", "Drones").
                 - "rating": Sản phẩm cao cấp, thương hiệu lớn thường có rating cao (4.5-5.0). Sản phẩm tầm trung thấp hơn (3.5-4.5).
-                - "isNew": Nếu tên sản phẩm có số phiên bản cao nhất hoặc có từ "pro", "max", "new" thì là `true`. Ngược lại là `false`.
+                - "isNew": Nếu tên sản phẩm có số phiên bản cao nhất, "new" thì là `true`. Ngược lại là `false`.
                 - "description": Viết một mô tả ngắn (1-2 câu) hấp dẫn về sản phẩm dựa trên tên và các đặc điểm đã suy luận.
                 - "features": Tạo một mảng 3-5 tính năng nổi bật nhất của loại sản phẩm đó.
                 - "specifications": Tạo một đối tượng chứa các thông số kỹ thuật quan trọng và phù hợp với loại sản phẩm.
@@ -126,7 +126,7 @@ def chatbot(request):
                 - "value": Giá trị mới.
 
         3.  **delete_product**: Khi admin muốn xóa sản phẩm.
-            - **Từ khóa**: "xóa", "xoá", "delete", "remove".
+            - **Từ khóa**: "xóa", "delete", "remove".
             - **Trích xuất bắt buộc**:
                 - "product_id": ID hoặc tên sản phẩm cần xóa.
 

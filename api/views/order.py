@@ -12,9 +12,31 @@ from api.serializers.order import OrderSerializer, OrderDetailSerializer, Create
 from api.models.product import Product # Thêm import Product
 from api.models.customer import Customer
 from api.models.order import OrderItem
+from api.models.review import Review
+from api.serializers.review import ReviewSerializer
 
-# --- PHIÊN BẢN AN TOÀN (KHUYẾN NGHỊ) ---
-# Yêu cầu người dùng phải đăng nhập. Frontend cần gửi kèm cookie.
+@api_view(['GET'])
+def get_all_reviews(request):
+    """
+    API endpoint để lấy danh sách tất cả các đánh giá.
+    CẢNH BÁO: View này KHÔNG YÊU CẦU XÁC THỰC.
+    Sắp xếp theo ngày tạo mới nhất.
+    """
+    try:
+        # Lấy tất cả các đánh giá, sắp xếp theo ngày tạo mới nhất
+        reviews = Review.objects.all().order_by('-created_at')
+        
+        # Sử dụng many=True vì chúng ta đang serialize một danh sách các đối tượng
+        serializer = ReviewSerializer(reviews, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_orders_by_customer(request, customer_id):
@@ -37,11 +59,7 @@ def get_orders_by_customer(request, customer_id):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-# --- PHIÊN BẢN KHÔNG AN TOÀN (HOẠT ĐỘNG NGAY VỚI FRONTEND HIỆN TẠI) ---
-# Không yêu cầu xác thực. Bất kỳ ai cũng có thể xem đơn hàng nếu có ID.
-# CẢNH BÁO: Đây là lỗ hổng bảo mật. Chỉ dùng cho mục đích phát triển.
 @api_view(['GET'])
-# @permission_classes([IsAuthenticated])  # <-- XÓC hoặc COMMENT dòng này
 def get_orders_by_customer(request, customer_id):
     """
     API endpoint để lấy danh sách đơn hàng của một khách hàng.
@@ -59,7 +77,6 @@ def get_orders_by_customer(request, customer_id):
         )
 
 @api_view(['GET'])
-# @permission_classes([IsAuthenticated])  # <-- XÓC hoặc COMMENT dòng này
 def get_order_detail(request, order_id):
     """
     API endpoint để lấy thông tin chi tiết của một đơn hàng.
@@ -111,10 +128,8 @@ def create_order(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    # Sử dụng serializer để xác thực dữ liệu đầu vào
-    # Chúng ta cần loại bỏ 'customer' khỏi data vì đã lấy ở trên
     order_data = request.data.copy()
-    order_data.pop('customer', None) # Xóa trường customer khỏi data để serializer không lỗi
+    order_data.pop('customer', None)
 
     serializer = CreateOrderSerializer(data=order_data)
     if serializer.is_valid():

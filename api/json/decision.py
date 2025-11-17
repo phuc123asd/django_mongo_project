@@ -45,6 +45,8 @@ def handle_admin_command(ai_response_string):
                 "action": action, 
                 "message": f"Đã nhận yêu cầu cập nhật sản phẩm '{payload.get('product_id', 'không xác định')}'."
             }
+            
+        
         elif action == "none":
             # Đây là trường hợp quan trọng nhất để thông báo lỗi cho admin
             message = payload.get("message", "Đã xảy ra lỗi không xác định.")
