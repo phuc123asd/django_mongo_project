@@ -57,7 +57,6 @@ def api_register(request):
     except Exception as e:
         return Response({'error': 'Đã có lỗi xảy ra.', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
 # --- LOGIN ---
 @api_view(['POST'])
 def api_login(request):
@@ -86,7 +85,6 @@ def api_login(request):
         'id': str(customer.id), # <-- Trả về ID để frontend fetch thông tin chi tiết
         'role': 'customer' # Backend chưa có logic role, mặc định là customer
     }, status=status.HTTP_200_OK)
-
 
 # --- LOGOUT ---
 @api_view(['POST'])
@@ -162,5 +160,39 @@ def update_customer(request, customer_id):
     except Exception as e:
         return Response(
             {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+@api_view(['GET'])
+def get_all_customers(request):
+    """
+    API endpoint để lấy tất cả khách hàng trong collection với bộ lọc.
+    """
+    try:
+        # Lấy tham số bộ lọc từ query parameters
+        city = request.query_params.get('city', None)
+        province = request.query_params.get('province', None)
+        
+        # Bắt đầu với queryset tất cả khách hàng
+        customers = Customer.objects.all()
+        
+        # Áp dụng bộ lọc nếu có
+        if city:
+            customers = customers.filter(city__icontains=city)
+        if province:
+            customers = customers.filter(province__icontains=province)
+        
+        # Serialize dữ liệu
+        serializer = CustomerSerializer(customers, many=True)
+        
+        return Response({
+            'customers': serializer.data,
+            'count': len(serializer.data)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Lỗi khi lấy danh sách khách hàng: {str(e)}")
+        return Response(
+            {"error": "Đã có lỗi xảy ra khi lấy danh sách khách hàng.", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

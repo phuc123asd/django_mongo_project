@@ -93,7 +93,7 @@ def chatbot(request):
 
         CẤU TRÚC JSON TRẢ VỀ:
         {
-            "action": "add_product | update_product | delete_product | approve_order | reject_order | get_order_status | none",
+            "action": "add_product | update_product | delete_product | approve_order | none",
             "payload": {
                 // Thông tin trích xuất được sẽ nằm ở đây
             }
@@ -190,16 +190,7 @@ def chatbot(request):
                 
                 - Input: "Duyệt tất cả đơn hàng đang chờ"
                 - Output: {"action": "approve_order", "payload": {"order_ids": []}}
-        5.  **reject_order**: Khi admin muốn từ chối đơn hàng.
-            - **Từ khóa**: "từ chối đơn", "hủy đơn", "reject order".
-            - **Trích xuất bắt buộc**:
-                - "order_id": ID của đơn hàng.
-                - "reason": Lý do từ chối (nếu có).
-        6.  **get_order_status**: Khi admin muốn kiểm tra trạng thái đơn hàng.
-            - **Từ khóa**: "kiểm tra đơn", "trạng thái đơn", "order status".
-            - **Trích xuất bắt buộc**:
-                - "order_id": ID của đơn hàng.
-        7.  **none**: Chỉ dùng khi không thể xác định được bất kỳ hành động nào ở trên.
+        5.  **none**: Chỉ dùng khi không thể xác định được bất kỳ hành động nào ở trên.
             - **Ví dụ**: Input: "chào buổi sáng" -> Output: {"action": "none", "payload": {"reason": "unknown_command", "message": "Yêu cầu không rõ ràng."}}
         LUÔN LUÔN TRẢ VỀ MỘT ĐỐI TƯỢNG JSON HỢP LỆ, KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO KHÁC.
         """
