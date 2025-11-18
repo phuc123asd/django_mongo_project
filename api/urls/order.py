@@ -7,4 +7,5 @@ urlpatterns = [
     path('customer/<str:customer_id>/', get_orders_by_customer, name='get_orders_by_customer'),
     path('<str:order_id>/', get_order_detail, name='get_order_detail'),
     path('', get_all_orders, name='get_all_orders'),
+    path('<str:order_id>/status/', update_order_status, name='update_order_status'),
 ]

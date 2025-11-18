@@ -2,14 +2,14 @@
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated # <-- Đối với phiên bản an toàn
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from mongoengine.errors import DoesNotExist
 from api.models.order import Order
 from api.serializers.order import OrderSerializer
 from mongoengine.errors import DoesNotExist, ValidationError
 from api.serializers.order import OrderSerializer, OrderDetailSerializer, CreateOrderSerializer # Thêm CreateOrderSerializer vào import
-from api.models.product import Product # Thêm import Product
+from api.models.product import Product
 from api.models.customer import Customer
 from api.models.order import OrderItem
 from api.models.review import Review
@@ -185,3 +185,50 @@ def get_all_orders(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+@api_view(['PUT', 'PATCH'])
+def update_order_status(request, order_id):
+    # Lấy trạng thái mới từ request body
+    new_status = request.data.get('status')
+    if not new_status:
+        return Response(
+            {"error": "Thiếu thông tin 'status' trong yêu cầu."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Danh sách các trạng thái hợp lệ
+    valid_statuses = ['Đang Xử Lý', 'Đang Vận Chuyển', 'Đã Giao']
+    
+    # Kiểm tra trạng thái có hợp lệ không
+    if new_status not in valid_statuses:
+        return Response(
+            {"error": f"Trạng thái không hợp lệ. Các trạng thái hợp lệ: {', '.join(valid_statuses)}"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Tìm đơn hàng
+        order = Order.objects.get(id=order_id)
+        
+        # Cập nhật trạng thái
+        order.status = new_status
+        order.save()
+        
+        # Trả về thông tin đơn hàng đã cập nhật
+        serializer = OrderDetailSerializer(order)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    except DoesNotExist:
+        return Response(
+            {"error": "Không tìm thấy đơn hàng."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except ValidationError:
+        return Response(
+            {"error": "ID đơn hàng không hợp lệ."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
