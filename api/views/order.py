@@ -14,6 +14,7 @@ from api.models.customer import Customer
 from api.models.order import OrderItem
 from api.models.review import Review
 from api.serializers.review import ReviewSerializer
+from api.serializers.customer import CustomerSerializer
 
 @api_view(['GET'])
 def get_all_reviews(request):
@@ -171,21 +172,15 @@ def create_order(request):
 @api_view(['GET'])
 def get_all_orders(request):
     """
-    API endpoint để lấy danh sách tất cả các đơn hàng.
-    CẢNH BÁO: View này KHÔNG YÊU CẦU XÁC THỰC.
-    Sắp xếp theo ngày tạo mới nhất.
+    API endpoint để lấy tất cả các đơn hàng.
     """
     try:
-        # Lấy tất cả các đơn hàng, sắp xếp theo ngày tạo mới nhất
-        orders = Order.objects.all().order_by('-created_at')
-        
-        # Sử dụng many=True vì chúng ta đang serialize một danh sách các đối tượng
-        serializer = OrderSerializer(orders, many=True)
+        orders = Order.objects.no_dereference().all()
+        serializer = OrderDetailSerializer(orders, many=True)
         
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
     except Exception as e:
         return Response(
-            {"error": str(e)},
+            {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

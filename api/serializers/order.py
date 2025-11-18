@@ -4,6 +4,7 @@ from api.models.order import Order, OrderItem
 from api.models.product import Product
 from api.models.customer import Customer
 from api.serializers.customer import CustomerSerializer
+from mongoengine.errors import DoesNotExist
 
 # --- Serializer cho các mặt hàng trong đơn hàng ---
 class OrderItemSerializer(serializers.Serializer):
@@ -53,34 +54,86 @@ class OrderSerializer(serializers.Serializer):
         return float(obj.price)
 
 class OrderDetailSerializer(OrderSerializer):
-    customer = CustomerSerializer(read_only=True)
+    # Ghi đè các trường này để xử lý DBRef
+    customer = serializers.SerializerMethodField()
+    items = serializers.SerializerMethodField()
     
+    def get_customer(self, obj):
+        """
+        Lấy thông tin khách hàng từ một DBRef một cách an toàn.
+        """
+        try:
+            # Khi dùng no_dereference(), obj.customer là một DBRef
+            # Lấy ID từ DBRef
+            customer_id = obj.customer.id
+            
+            # Chủ động truy vấn Customer bằng ID này
+            customer_instance = Customer.objects.get(id=customer_id)
+            
+            # Nếu tìm thấy, serialize và trả về
+            serializer = CustomerSerializer(customer_instance)
+            return serializer.data
+            
+        except Customer.DoesNotExist:
+            # Bắt lỗi nếu không tìm thấy khách hàng
+            return {
+                'id': str(customer_id),
+                'email': 'Khách hàng không tồn tại',
+                'name': 'Khách hàng không tồn tại'
+            }
+        except Exception:
+            # Bắt các lỗi khác (ví dụ obj.customer là None)
+            return {
+                'id': 'Không xác định',
+                'email': 'Lỗi khi truy xuất khách hàng',
+                'name': 'Lỗi khi truy xuất khách hàng'
+            }
+
     def get_items(self, obj):
-        # Lấy thông tin chi tiết của sản phẩm
-        items = []
+        """
+        Lấy thông tin chi tiết của sản phẩm trong đơn hàng từ DBRef.
+        """
+        items_data = []
         for item in obj.items:
             try:
-                product = Product.objects.get(id=item.product)
-                items.append({
+                # item.product là một DBRef
+                product_id = item.product.id
+                
+                # Chủ động truy vấn Product bằng ID này
+                product_instance = Product.objects.get(id=product_id)
+                
+                items_data.append({
                     'product': {
-                        'id': str(product.id),
-                        'name': product.name,
-                        'image': product.image,
+                        'id': str(product_instance.id),
+                        'name': product_instance.name,
+                        'image': product_instance.image,
                     },
                     'quantity': item.quantity,
-                    'price': item.price
+                    'price': float(item.price)
                 })
+                
             except Product.DoesNotExist:
-                items.append({
+                # Bắt lỗi nếu không tìm thấy sản phẩm
+                items_data.append({
                     'product': {
-                        'id': str(item.product),
+                        'id': str(product_id),
                         'name': 'Sản phẩm không tồn tại',
                         'image': '',
                     },
                     'quantity': item.quantity,
-                    'price': item.price
+                    'price': float(item.price)
                 })
-        return items
+            except Exception:
+                items_data.append({
+                    'product': {
+                        'id': 'Không xác định',
+                        'name': 'Lỗi khi truy xuất sản phẩm',
+                        'image': '',
+                    },
+                    'quantity': item.quantity,
+                    'price': float(item.price)
+                })
+        return items_data
 
 class CreateOrderSerializer(serializers.Serializer):
     """
