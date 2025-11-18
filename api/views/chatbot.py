@@ -112,9 +112,22 @@ def chatbot(request):
                 - "brand": Xác định dựa trên tên sản phẩm gồm có("Apple", "Samsung", "Dell", "Microsoft", "Nintendo", "DJI", "Logitech", "Canon", "GoPro", "Fitbit", "Razer", "HP", "Bose", "Google", "Asus", "Lenovo", "Xiaomi", "OnePlus", "Drones").
                 - "rating": Sản phẩm cao cấp, thương hiệu lớn thường có rating cao (4.5-5.0). Sản phẩm tầm trung thấp hơn (3.5-4.5).
                 - "isNew": Nếu tên sản phẩm có số phiên bản cao nhất, "new" thì là `true`. Ngược lại là `false`.
-                - "description": Viết một mô tả ngắn (1-2 câu) hấp dẫn về sản phẩm dựa trên tên và các đặc điểm đã suy luận.
-                - "features": Tạo một mảng 3-5 tính năng nổi bật nhất của loại sản phẩm đó.
-                - "specifications": Tạo một đối tượng chứa các thông số kỹ thuật quan trọng và phù hợp với loại sản phẩm.
+                - "description": VIẾT MÔ TẢ HẤP DẪN và lôi cuốn:
+                    * Bắt đầu bằng một câu khẳng định mạnh mẽ về sản phẩm
+                    * Tập trung vào lợi ích thực tế cho người dùng, không chỉ tính năng
+                    * Sử dụng từ ngữ gợi cảm xúc (đột phá, tuyệt vời, không thể bỏ qua, etc.)
+                    * Kết thúc bằng lời kêu gọi hành động hoặc lời khuyên hữu ích
+                    * Ví dụ: "Trải nghiệm công nghệ đỉnh cao với iPhone 15 Pro - thiết kế titan siêu bền, chip A17 Pro mạnh mẽ hơn 30% và camera zoom quang học 5x không đối thủ. Nâng cấp ngay hôm nay để khám phá tiềm năng không giới hạn!"
+                - "features": Tạo một mảng 3-5 tính năng nổi bật nhất:
+                    * Mỗi tính năng nên bắt đầu bằng động từ mạnh (Tận hưởng, Khám phá, Trải nghiệm, etc.)
+                    * Tập trung vào lợi ích trực tiếp cho người dùng
+                    * Sử dụng ngôn ngữ gợi hình và hấp dẫn
+                    * Ví dụ: ["Tận hưởng màn hình Super Retina XDR với độ sáng vượt trội", "Khám phá sức mạnh của chip A17 Pro với hiệu năng đột phá", "Chụp ảnh chuyên nghiệp với hệ thống 3 camera và zoom quang học 5x"]
+                - "specifications": Tạo đối tượng thông số kỹ thuật ấn tượng:
+                    * Sử dụng thuật ngữ chuyên ngành phù hợp
+                    * Làm nổi bật các thông số quan trọng nhất
+                    * Thêm đơn vị đo lường để tăng độ tin cậy
+                    * Ví dụ: {"Màn hình": "6.1 inch Super Retina XDR", "Chip": "A17 Pro 6 nhân", "Camera": "48MP chính + 12MP siêu rộng + 12MP tele", "Pin": "Lên đến 23 giờ video playback", "Bộ nhớ": "128GB/256GB/512GB/1TB", "Kháng nước": "IP68"}
                 - "reviewCount": Sản phẩm mới thường có ít đánh giá (0-50). Sản phẩm phổ biến có nhiều hơn (100+).
                 - "inStock": Thường là `true` trừ khi có dấu hiệu cho thấy hết hàng.
                 - "hasARView": Các sản phẩm công nghệ cao, đắt tiền (đặc biệt là của Apple, Samsung) thường có tính năng này.
