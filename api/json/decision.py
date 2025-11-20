@@ -5,13 +5,13 @@ from api.services.order_service import *
 def handle_admin_command(ai_response_string):
     try:
         action_data = json.loads(ai_response_string)
-        print(f"✅ Phân tích JSON thành công: {action_data}")
+        print(f" Phân tích JSON thành công: {action_data}")
 
         action = action_data.get("action")
         payload = action_data.get("payload", {})
 
         if action == "add_product":
-            print(f"🚀 HÀNH ĐỘNG: THÊM SẢN PHẨM MỚI")
+            print(f" HÀNH ĐỘNG: THÊM SẢN PHẨM MỚI")
             print(f"   - Dữ liệu payload từ AI: {payload}")
             
             # Kiểm tra các trường bắt buộc
@@ -38,13 +38,13 @@ def handle_admin_command(ai_response_string):
             return add_product(payload)
 
         elif action == "update_product":
-            print(f"✏️ HÀNH ĐỘNG: CẬP NHẬT SẢN PHẨM")
+            print(f" HÀNH ĐỘNG: CẬP NHẬT SẢN PHẨM")
             print(f"   - Dữ liệu payload: {payload}")
             # Gọi hàm update_product để thực hiện cập nhật
             return update_product(payload)
         
         elif action == "delete_product":
-            print(f"🗑️ HÀNH ĐỘNG: XÓA SẢN PHẨM")
+            print(f" HÀNH ĐỘNG: XÓA SẢN PHẨM")
             print(f"   - Dữ liệu payload từ AI: {payload}")
             
             # Bắt buộc phải có product_id
@@ -64,7 +64,7 @@ def handle_admin_command(ai_response_string):
             return delete_product(product_id)
         
         elif action == "approve_order":
-            print(f"✅ HÀNH ĐỘNG: DUYỆT ĐƠN HÀNG")
+            print(f" HÀNH ĐỘNG: DUYỆT ĐƠN HÀNG")
             print(f"   - Dữ liệu payload: {payload}")
             
             # Lấy danh sách order_id từ payload
@@ -76,12 +76,12 @@ def handle_admin_command(ai_response_string):
         elif action == "none":
             # Đây là trường hợp quan trọng nhất để thông báo lỗi cho admin
             message = payload.get("message", "Đã xảy ra lỗi không xác định.")
-            print(f"🛑 HÀNH ĐỘNG: KHÔNG THỰC HIỆN (NONE)")
+            print(f" HÀNH ĐỘNG: KHÔNG THỰC HIỆN (NONE)")
             print(f"   - Thông báo cho Admin: {message}")
             # --- SỬA LỖI: Trả về kết quả thay vì `pass` ---
             return {"success": False, "action": action, "error": message}
         else:
-            print(f"❓ HÀNH ĐỘNG KHÔNG HỢP LỆ: '{action}'")
+            print(f" HÀNH ĐỘNG KHÔNG HỢP LỆ: '{action}'")
             # --- SỬA LỖI: Trả về kết quả thay vì `pass` ---
             return {"success": False, "action": "none", "error": f"Hành động không hợp lệ: {action}"}
 

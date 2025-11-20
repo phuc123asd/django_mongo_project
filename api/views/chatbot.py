@@ -176,19 +176,16 @@ def chatbot(request):
                 - Output: {"action": "update_product", "payload": {"product_id": "iPhone 14", "inStock": false}}
                 
                 - Input: "Cập nhật tính năng cho Apple Watch Series 9: ['Theo dõi oxy máu', 'GPS', 'Chống nước 50m']"
-                - Output: {"action": "update_product", "payload": {"product_id": "Apple Watch Series 9", "features": ["Theo dõi oxy máu", "GPS", "Chống nước 50m"]}}
-            
+                - Output: {"action": "update_product", "payload": {"product_id": "Apple Watch Series 9", "features": ["Theo dõi oxy máu", "GPS", "Chống nước 50m"]}}         
             - **LƯU Ý QUAN TRỌNG**:
                 - Luôn xác định đúng sản phẩm cần cập nhật dựa trên tên hoặc ID
                 - Có thể cập nhật nhiều trường cùng lúc
                 - Nếu admin nói "giảm giá" hoặc "tăng giá" mà không nói giá cụ thể, hãy hỏi giá mới
                 - Với thông số kỹ thuật, tạo đối tượng với các cặp key-value phù hợp
-
         3.  **delete_product**: Khi admin muốn xóa sản phẩm.
             - **Từ khóa**: "xóa", "delete", "remove".
             - **Trích xuất bắt buộc**:
                 - "product_id": ID (Nếu thiếu thì yêu cầu người dung bổ sung)
-
         4.  **approve_order**: Khi admin muốn duyệt đơn hàng.
             - **Từ khóa**: "duyệt đơn", "chấp nhận đơn", "approve order", "duyệt nhiều đơn", "duyệt tất cả đơn".
             - **Trích xuất bắt buộc**:
@@ -203,6 +200,8 @@ def chatbot(request):
                 
                 - Input: "Duyệt tất cả đơn hàng đang chờ"
                 - Output: {"action": "approve_order", "payload": {"order_ids": []}}
+        
+        
         5.  **none**: Chỉ dùng khi không thể xác định được bất kỳ hành động nào ở trên.
             - **Ví dụ**: Input: "chào buổi sáng" -> Output: {"action": "none", "payload": {"reason": "unknown_command", "message": "Yêu cầu không rõ ràng."}}
         LUÔN LUÔN TRẢ VỀ MỘT ĐỐI TƯỢNG JSON HỢP LỆ, KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO KHÁC.
