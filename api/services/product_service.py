@@ -2,6 +2,42 @@ from api.models.product import Product
 from api.models.productdetail import ProductDetail
 from mongoengine.errors import ValidationError, NotUniqueError
 from bson.errors import InvalidId
+import cloudinary.uploader
+def get_public_id_from_cloudinary_url(url: str):
+    """
+    Trích public_id từ URL Cloudinary chuẩn.
+    Ví dụ:
+        url = https://res.cloudinary.com/.../upload/v12345/abcxyz.webp
+        => public_id = 'abcxyz'
+    """
+    try:
+        # Tách phần sau /upload/
+        after_upload = url.split("/upload/")[-1]      # "v1763887599/se9ok1axdrxuh7drrpfw.webp"
+
+        # Bỏ "v123456/" đi
+        parts = after_upload.split("/", 1)
+        if parts[0].startswith("v") and parts[0][1:].isdigit():
+            file_part = parts[1]  # "se9ok1axdrxuh7drrpfw.webp"
+        else:
+            file_part = after_upload
+
+        # Bỏ extension (.jpg, .png, .webp...)
+        public_id = file_part.rsplit(".", 1)[0]
+
+        return public_id
+    except Exception:
+        return None
+
+def delete_cloudinary_image(url):
+    public_id = get_public_id_from_cloudinary_url(url)
+    if not public_id:
+        return {"success": False, "error": "Không tách được public_id từ URL"}
+
+    try:
+        res = cloudinary.uploader.destroy(public_id)
+        return {"success": True, "public_id": public_id, "result": res}
+    except Exception as e:
+        return {"success": False, "public_id": public_id, "error": str(e)}
 
 def add_product(payload):
     """
@@ -80,50 +116,51 @@ def add_product(payload):
 
 def delete_product(product_id):
     """
-    Tìm và xóa một sản phẩm dựa trên ID hoặc tên.
-    - product_id: có thể là chuỗi ID của MongoDB hoặc tên sản phẩm.
+    Xóa ảnh Cloudinary trước rồi xóa Product + ProductDetail.
     """
-    product_to_delete = None
 
-    # 1. Thử tìm sản phẩm theo tên trước
-    product_to_delete = Product.objects(name=product_id).first()
+    # 1. Tìm sản phẩm
+    product = Product.objects(name=product_id).first()
+    if not product:
+        product = Product.objects(id=product_id).first()
 
-    # 2. Nếu không tìm thấy theo tên, thử tìm theo ID
-    if not product_to_delete:
-        try:
-            product_to_delete = Product.objects(id=product_id).first()
-        except InvalidId:
-            # ID không hợp lệ (ví dụ: sai định dạng)
-            return {
-                "success": False,
-                "action": "delete_product",
-                "error": f"ID sản phẩm '{product_id}' không hợp lệ."
-            }
+    if not product:
+        return {"success": False, "error": "Không tìm thấy sản phẩm"}
 
-    # 3. Kiểm tra lại lần cuối xem đã tìm thấy sản phẩm chưa
-    if not product_to_delete:
-        return {
-            "success": False,
-            "action": "delete_product",
-            "error": f"Không tìm thấy sản phẩm nào với ID hoặc tên là '{product_id}'."
-        }
+    # 2. Gom tất cả ảnh
+    image_urls = []
 
-    # 4. Nếu tìm thấy, thực hiện xóa
-    try:
-        product_name = product_to_delete.name
-        product_to_delete.delete()
-        # Nhờ reverse_delete_rule=CASCADE, ProductDetail liên quan sẽ tự động bị xóa.
-        return {
-            "success": True,
-            "action": "delete_product",
-            "message": f"Đã xóa thành công sản phẩm '{product_name}'."
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "action": "delete_product",
-            "error": f"Đã xảy ra lỗi khi xóa sản phẩm: {e}"
-        }
+    # Ảnh từ Product
+    if hasattr(product, "image") and product.image:
+        image_urls.append(product.image)
+
+    if hasattr(product, "images") and product.images:
+        image_urls.extend(product.images)
+
+    # Ảnh từ ProductDetail
+    details = ProductDetail.objects(product=product)
+    for d in details:
+        if hasattr(d, "image") and d.image:
+            image_urls.append(d.image)
+        if hasattr(d, "images") and d.images:
+            image_urls.extend(d.images)
+
+    # 3. Xóa ảnh Cloudinary
+    cloudinary_results = []
+    for url in image_urls:
+        result = delete_cloudinary_image(url)
+        cloudinary_results.append(result)
+
+    # 4. Xóa dữ liệu DB (CASCADE sẽ tự xóa ProductDetail)
+    product_name = product.name
+    product.delete()
+
+    return {
+        "success": True,
+        "message": f"Đã xóa sản phẩm {product_name} và toàn bộ ảnh.",
+        "cloudinary_results": cloudinary_results
+    }
+
 
 def update_product(payload):
     """
