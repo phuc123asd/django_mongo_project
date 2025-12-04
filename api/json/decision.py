@@ -121,8 +121,7 @@ def handle_admin_command(ai_response_string):
                     return {
                         "success": True,
                         "action": "statistics",
-                        "type": stats_type,
-                        "summary": summary
+                        "answer": summary
                     }
                 
                 # Trả về dữ liệu thống kê đầy đủ
