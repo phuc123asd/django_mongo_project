@@ -128,8 +128,7 @@ def handle_admin_command(ai_response_string):
                 return {
                     "success": True,
                     "action": "statistics",
-                    "type": stats_type,
-                    "data": stats_data
+                    "message": stats_data
                 }
                 
             except Exception as e:

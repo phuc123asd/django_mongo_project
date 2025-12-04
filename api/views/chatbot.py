@@ -238,7 +238,7 @@ def chatbot(request):
                 {"role": "system", "content": command_extraction_prompt},
                 {"role": "user", "content": f"Câu hỏi: {question}"}
             ],
-            max_tokens=500, # Tăng lên để đủ không gian cho JSON
+            max_tokens=500,
             temperature=0,
         )
         
@@ -248,7 +248,7 @@ def chatbot(request):
         # Gọi hàm xử lý và nhận kết quả
         result = handle_admin_command(answer)
 
-        # --- THÊM PHẦN CẢI TIẾN Ở ĐÂY ---
+        
         if result.get("action") == "none":
             # Khi không phải lệnh admin → trả lời trò chuyện tự nhiên
             conv_response = client.chat.completions.create(
@@ -266,4 +266,45 @@ def chatbot(request):
                 "action": "general_chat",
                 "answer": natural_answer
             })
+        elif result.get("action") == "statistics":
+            try:
+                stats_data = result.get("message", {})
+                
+                # Tạo một prompt để GPT diễn giải dữ liệu thống kê thành văn bản tự nhiên
+                analyst_prompt = f"""
+                Bạn là một nhà phân tích kinh doanh chuyên nghiệp cho cửa hàng TechHub.
+                Dựa trên dữ liệu thống kê được cung cấp dưới dạng JSON, hãy tạo một bản tóm tắt ngắn gọn, súc tích và hấp dẫn cho quản trị viên.
+                Bản tóm tắt nên làm nổi bật các điểm chính, các xu hướng quan trọng và những hiểu biết có giá trị.
+                Hãy trình bày một cách rõ ràng và dễ hiểu.
+                Dữ liệu thống kê:
+                {json.dumps(stats_data, indent=2, ensure_ascii=False)}
+                """
+                
+                # Gọi API OpenAI để tạo bản tóm tắt
+                conv_response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": analyst_prompt},
+                    ],
+                     max_tokens=500,
+                    temperature=0.7,              
+                )
+                
+                natural_summary = conv_response.choices[0].message.content.strip()
+                
+                # Trả về kết quả với định dạng chuẩn
+                return JsonResponse({
+                    "success": True,
+                    "action": "statistics",
+                    "answer": natural_summary
+                })
+            except Exception as e:
+                print(f"[CHATBOT] Lỗi khi tóm tắt thống kê: {e}")
+                return JsonResponse({
+                    "success": False,
+                    "action": "statistics",
+                    "error": f"Không thể tạo tóm tắt: {str(e)}",
+                    # Bạn có thể chọn trả về dữ liệu thô để gỡ lỗi
+                    "raw_data": result.get("message", {}) 
+                }, status=500) # Trả về mã lỗi 500 cho lỗi máy chủ
         return JsonResponse(result)
