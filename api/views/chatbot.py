@@ -23,8 +23,11 @@ def chatbot(request):
     role = ""
     
     if request.content_type and 'multipart/form-data' in request.content_type:
+        print(f"[CHATBOT] Xử lý request dạng multipart/form-data")
         question = request.POST.get('question', '')
         role = request.POST.get('role', '')
+        print(f"[CHATBOT] Question: {question}")
+        print(f"[CHATBOT] Role: {role}")
         
         uploaded_files = request.FILES.getlist('images')
 
@@ -93,7 +96,7 @@ def chatbot(request):
 
         CẤU TRÚC JSON TRẢ VỀ:
         {
-            "action": "add_product | update_product | delete_product | approve_order | none",
+            "action": "add_product | update_product | delete_product | approve_order | statistics | none",
             "payload": {
                 // Thông tin trích xuất được sẽ nằm ở đây
             }
@@ -200,9 +203,31 @@ def chatbot(request):
                 
                 - Input: "Duyệt tất cả đơn hàng đang chờ"
                 - Output: {"action": "approve_order", "payload": {"order_ids": []}}
-        
-        
-        5.  **none**: Chỉ dùng khi không thể xác định được bất kỳ hành động nào ở trên.
+        5.  **statistics**: Khi admin muốn xem thống kê.
+            - **Từ khóa**: "thống kê", "báo cáo", "phân tích", "tổng quan", "doanh thu", "sản phẩm bán chạy", "khách hàng"
+            - **Trích xuất BẮT BUỘC**:
+                - "type": Loại thống kê cần thực hiện. Các loại có thể có:
+                    * "overview": Thống kê tổng quan
+                    * "revenue": Thống kê doanh thu
+                    * "geographical": Thống kê theo địa lý
+                    * "products": Thống kê sản phẩm
+                    * "customers": Thống kê khách hàng
+                - **Tùy chọn**:
+                    - "days": Số ngày cần thống kê (mặc định là 30 ngày)
+                    - "format": Định dạng trả về ("json" hoặc "summary")
+            - **VÍ DỤ CỤ THỂ**:
+                - Input: "Cho tôi xem thống kê tổng quan"
+                - Output: {"action": "statistics", "payload": {"type": "overview"}}
+                
+                - Input: "Thống kê doanh thu 7 ngày gần đây"
+                - Output: {"action": "statistics", "payload": {"type": "revenue", "days": 7}}
+                
+                - Input: "Xem thống kê sản phẩm bán chạy nhất"
+                - Output: {"action": "statistics", "payload": {"type": "products"}}
+                
+                - Input: "Phân tích khách hàng theo RFM"
+                - Output: {"action": "statistics", "payload": {"type": "customers"}}
+        6.  **none**: Chỉ dùng khi không thể xác định được bất kỳ hành động nào ở trên.
             - **Ví dụ**: Input: "chào buổi sáng" -> Output: {"action": "none", "payload": {"reason": "unknown_command", "message": "Yêu cầu không rõ ràng."}}
         LUÔN LUÔN TRẢ VỀ MỘT ĐỐI TƯỢNG JSON HỢP LỆ, KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO KHÁC.
         """
