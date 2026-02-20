@@ -12,11 +12,15 @@ class OrderItem(EmbeddedDocument):
 
 class Order(Document):
     STATUS_CHOICES = ['Đang Xử Lý', 'Đang Vận Chuyển', 'Đã Giao']
+    PAYMENT_METHOD_CHOICES = ['cod', 'momo', 'qr']
+    PAYMENT_STATUS_CHOICES = ['pending', 'paid', 'failed']
     
     customer = fields.ReferenceField(Customer, required=True)
     items = fields.ListField(fields.EmbeddedDocumentField(OrderItem))
     total_price = fields.DecimalField(required=True, precision=2)
     status = fields.StringField(required=True, choices=STATUS_CHOICES, default='Đang Xử Lý')
+    payment_method = fields.StringField(required=True, choices=PAYMENT_METHOD_CHOICES, default='cod')
+    payment_status = fields.StringField(choices=PAYMENT_STATUS_CHOICES, default='pending')
     shipping_address = fields.StringField(required=True)
     city = fields.StringField(required=True)
     province = fields.StringField(required=True)

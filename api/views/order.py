@@ -146,6 +146,7 @@ def create_order(request):
                 customer=customer, # Sử dụng customer object đã lấy ở trên
                 items=[OrderItem(**item) for item in order_items_data],
                 total_price=total_price,
+                payment_method=validated_data['payment_method'],
                 shipping_address=validated_data['shipping_address'],
                 city=validated_data['city'],
                 province=validated_data['province'],

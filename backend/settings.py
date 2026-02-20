@@ -106,6 +106,7 @@ DATABASES = {
 mongoengine.connect(
     name='mydb',
     host='mongodb+srv://admin:123@cluster0.gdq3i7q.mongodb.net/?appName=Cluster0',
+    tlsAllowInvalidCertificates=True  # Tạm thời bypass SSL certificate verification cho development
 )
 
 

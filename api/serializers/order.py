@@ -28,6 +28,8 @@ class OrderSerializer(serializers.Serializer):
     items = OrderItemSerializer(many=True, read_only=True)
     total_price = serializers.SerializerMethodField()
     status = serializers.CharField()
+    payment_method = serializers.CharField()
+    payment_status = serializers.CharField()
     shipping_address = serializers.CharField()
     city = serializers.CharField()
     province = serializers.CharField()
@@ -149,6 +151,7 @@ class CreateOrderSerializer(serializers.Serializer):
     province = serializers.CharField(max_length=100, required=True)
     postal_code = serializers.CharField(max_length=20, required=True)
     phone = serializers.CharField(max_length=20, required=True)
+    payment_method = serializers.ChoiceField(choices=['cod', 'momo', 'qr'], required=True)
 
     def validate_items(self, items):
         """
