@@ -21,6 +21,8 @@ VNPAY_PAYMENT_URL = config(
 )
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
 USD_TO_VND = config("USD_TO_VND", default=25000, cast=int)
+MIN_PAYMENT_VND = 1000
+MAX_PAYMENT_VND = 50000000
 VNPAY_EXPIRE_MINUTES = config("VNPAY_EXPIRE_MINUTES", default=30, cast=int)
 VNPAY_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -43,6 +45,20 @@ def _resolve_client_ip(request) -> str:
     return request.META.get("REMOTE_ADDR", "127.0.0.1")
 
 
+def _validate_amount_range(amount_vnd: int):
+    if amount_vnd < MIN_PAYMENT_VND:
+        return (
+            f"Số tiền quy đổi ({amount_vnd:,} VND) nhỏ hơn mức tối thiểu "
+            f"{MIN_PAYMENT_VND:,} VND."
+        )
+    if amount_vnd > MAX_PAYMENT_VND:
+        return (
+            f"Số tiền quy đổi ({amount_vnd:,} VND) vượt mức tối đa "
+            f"{MAX_PAYMENT_VND:,} VND."
+        )
+    return ""
+
+
 @api_view(["POST"])
 def create_vnpay_payment(request):
     order_id = request.data.get("order_id")
@@ -61,7 +77,18 @@ def create_vnpay_payment(request):
         return Response({"error": "Không tìm thấy đơn hàng"}, status=status.HTTP_404_NOT_FOUND)
 
     amount_vnd = int(float(str(order.total_price)) * USD_TO_VND)
-    amount_vnd = max(amount_vnd, 1000)
+    amount_error = _validate_amount_range(amount_vnd)
+    if amount_error:
+        return Response(
+            {
+                "error": amount_error,
+                "amount_vnd": amount_vnd,
+                "min_vnd": MIN_PAYMENT_VND,
+                "max_vnd": MAX_PAYMENT_VND,
+                "exchange_rate": USD_TO_VND,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
     now = datetime.now(VNPAY_TIMEZONE)

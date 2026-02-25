@@ -1,14 +1,15 @@
 # api/models/order.py
 from mongoengine import Document, fields, EmbeddedDocument
 from api.models.customer import Customer
-from api.models.product import Product
 from datetime import datetime
 
 
 class OrderItem(EmbeddedDocument):
-    product = fields.ReferenceField(Product, required=True)
+    # Cấu trúc mới: lưu product_id + quantity trong order item
+    product_id = fields.StringField(required=False)
     quantity = fields.IntField(required=True, min_value=1)
-    price = fields.DecimalField(required=True, precision=2, force_string=True)
+    unit_price = fields.DecimalField(required=False, precision=2, force_string=True)
+    meta = {"strict": False}
 
 class Order(Document):
     STATUS_CHOICES = ['Đang Xử Lý', 'Đang Vận Chuyển', 'Đã Giao']

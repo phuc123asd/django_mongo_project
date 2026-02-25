@@ -137,8 +137,8 @@ def create_order(request):
         validated_data = serializer.validated_data
         order_items_data = validated_data['items']
 
-        # Tính tổng giá tiền
-        total_price = sum(item['price'] * item['quantity'] for item in order_items_data)
+        # Tính tổng giá tiền theo cấu trúc item mới (product_id + quantity + unit_price)
+        total_price = sum(float(item['unit_price']) * item['quantity'] for item in order_items_data)
 
         # Tạo đối tượng Order
         try:

@@ -352,15 +352,20 @@ class OrderStatisticsService:
         """
         print(f"[STATS_SERVICE] Bắt đầu lấy thống kê sản phẩm")
         try:
+            def normalize_product_id(raw_id):
+                if hasattr(raw_id, "id"):
+                    return str(raw_id.id)
+                return str(raw_id)
+
             # Pipeline để thống kê sản phẩm
             product_pipeline = [
                 {"$unwind": "$items"},
                 {"$group": {
-                    "_id": "$items.product",
+                    "_id": {"$ifNull": ["$items.product_id", "$items.product"]},
                     "quantity": {"$sum": "$items.quantity"},
                     "revenue": {"$sum": {"$multiply": [
                         "$items.quantity",
-                        {"$toDecimal": "$items.price"}
+                        {"$toDecimal": {"$ifNull": ["$items.unit_price", "$items.price"]}}
                     ]}},
                     "orders": {"$addToSet": "$_id"}
                 }},
@@ -374,7 +379,7 @@ class OrderStatisticsService:
             print(f"[STATS_SERVICE] Đã phân tích {len(product_stats)} sản phẩm")
             
             # Lấy thông tin chi tiết sản phẩm
-            product_ids = [item['_id'] for item in product_stats]
+            product_ids = [normalize_product_id(item['_id']) for item in product_stats]
             products = Product.objects(id__in=product_ids)
             
             product_details = {}
@@ -393,7 +398,7 @@ class OrderStatisticsService:
             detailed_top_orders = []
             
             for item in product_stats[:20]:
-                product_id = str(item['_id'])
+                product_id = normalize_product_id(item['_id'])
                 details = product_details.get(product_id, {})
                 
                 # Xử lý revenue (Decimal128)

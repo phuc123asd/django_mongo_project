@@ -29,6 +29,8 @@ BACKEND_URL  = config('BACKEND_URL',  default='http://127.0.0.1:8000')
 
 # Tỉ giá quy đổi USD → VND (chỉnh sửa nếu hệ thống đã dùng VND)
 USD_TO_VND = config('USD_TO_VND', default=25000, cast=int)
+MIN_PAYMENT_VND = 1000
+MAX_PAYMENT_VND = 50000000
 
 
 def _build_signature(data: dict) -> str:
@@ -47,6 +49,20 @@ def _create_signature(raw_signature: str) -> str:
         raw_signature.encode('utf-8'),
         hashlib.sha256
     ).hexdigest()
+
+
+def _validate_amount_range(amount_vnd: int):
+    if amount_vnd < MIN_PAYMENT_VND:
+        return (
+            f"Số tiền quy đổi ({amount_vnd:,} VND) nhỏ hơn mức tối thiểu "
+            f"{MIN_PAYMENT_VND:,} VND."
+        )
+    if amount_vnd > MAX_PAYMENT_VND:
+        return (
+            f"Số tiền quy đổi ({amount_vnd:,} VND) vượt mức tối đa "
+            f"{MAX_PAYMENT_VND:,} VND."
+        )
+    return ""
 
 
 # ── Tạo yêu cầu thanh toán ───────────────────────────────────────────────────
@@ -68,8 +84,18 @@ def create_momo_payment(request):
 
     # Chuyển đổi sang VND (MoMo yêu cầu số nguyên, đơn vị VND)
     amount_vnd = int(float(str(order.total_price)) * USD_TO_VND)
-    # Đảm bảo tối thiểu 1000 VND
-    amount_vnd = max(amount_vnd, 1000)
+    amount_error = _validate_amount_range(amount_vnd)
+    if amount_error:
+        return Response(
+            {
+                "error": amount_error,
+                "amount_vnd": amount_vnd,
+                "min_vnd": MIN_PAYMENT_VND,
+                "max_vnd": MAX_PAYMENT_VND,
+                "exchange_rate": USD_TO_VND,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     request_id   = str(uuid.uuid4())
     # Thêm timestamp vào orderId để tránh trùng khi retry
