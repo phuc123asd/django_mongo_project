@@ -6,9 +6,15 @@ from pathlib import Path
 import os
 from decouple import config, Csv
 import mongoengine
+import certifi
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Ensure OpenSSL can locate trusted CA certificates for outbound TLS (SMTP, HTTPS).
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+os.environ.setdefault("CURL_CA_BUNDLE", certifi.where())
 
 # --- BẮT ĐẦU CẤU HÌNH TỪ .ENV ---
 # Đây là nơi duy nhất các biến môi trường được đọc.
@@ -147,3 +153,18 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = True
 SESSION_SAVE_EVERY_REQUEST = True
+
+# Cấu hình Email
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='support@techhub.com')
+
+# Disable SSL verification for development (enable in production with proper certificates)
+if DEBUG:
+    import ssl
+    ssl._create_default_https_context = ssl._create_unverified_context

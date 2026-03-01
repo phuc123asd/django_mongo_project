@@ -9,4 +9,5 @@ urlpatterns = [
     path('chatbot/', include('api.urls.chatbot')),
     path('upload-image/', include('api.urls.upload_image')),
     path('brand/', include('api.urls.brand')),
+    path('contact/', include('api.urls.contact')),
 ]
