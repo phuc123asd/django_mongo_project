@@ -1,7 +1,7 @@
 import json
-from api.services.product_service import *
-from api.services.order_service import *
-from api.services.order_statistics_service import OrderStatisticsService
+from api.services.product_service import add_product, update_product, delete_product  # type: ignore
+from api.services.order_service import approve_multiple_orders  # type: ignore
+from api.services.order_statistics_service import OrderStatisticsService  # type: ignore
 
 def handle_admin_command(ai_response_string):
     try:
@@ -229,3 +229,171 @@ def create_statistics_summary(stats_type, stats_data):
     
     else:
         return f"Đã lấy thống kê loại {stats_type} thành công."
+
+def execute_tool_call(action, payload):
+    try:
+        print(f" [EXECUTE TOOL] Hành động: {action} - Payload: {payload}")
+        
+        if action == "add_product":
+            name = payload.get("name")
+            price = payload.get("price")
+            images = payload.get("images")
+            missing = [k for k, v in {"name": name, "price": price, "images": images}.items() if not v]
+            if missing:
+                return {"success": False, "action": action, "error": f"Vui lòng cung cấp: {', '.join(missing)}"}
+            return add_product(payload)
+            
+        elif action == "update_product":
+            if not payload.get("product_id"):
+                return {"success": False, "action": action, "error": "Vui lòng cung cấp ID sản phẩm cần cập nhật."}
+            return update_product(payload)
+            
+        elif action == "delete_product":
+            product_id = payload.get("product_id")
+            if not product_id:
+                return {"success": False, "action": action, "error": "Vui lòng cung cấp ID sản phẩm cần xóa."}
+            return delete_product(product_id)
+            
+        elif action == "approve_order":
+            order_ids = payload.get("order_ids", [])
+            return approve_multiple_orders(order_ids)
+            
+        elif action == "get_statistics":
+            stats_type = payload.get("type", "overview")
+            days = payload.get("days", 30)
+            stats_service = OrderStatisticsService()
+            
+            if stats_type == "overview":
+                stats_data = stats_service.get_overview_statistics()
+            elif stats_type == "revenue":
+                stats_data = stats_service.get_revenue_statistics(days)
+            elif stats_type == "geographical":
+                stats_data = stats_service.get_geographical_statistics()
+            elif stats_type == "products":
+                stats_data = stats_service.get_product_statistics()
+            elif stats_type == "customers":
+                stats_data = stats_service.get_customer_statistics()
+            else:
+                return {"success": False, "action": "statistics", "error": "Invalid type parameter"}
+            
+            summary = create_statistics_summary(stats_type, stats_data)
+            return {"success": True, "action": "statistics", "answer": summary}
+            
+        elif action == "navigate_page":
+            path = payload.get("path")
+            return {"success": True, "action": "navigate", "payload": {"path": path}, "message": f"Đang chuyển hướng đến {path}"}
+            
+        elif action == "get_orders_list":
+            status = payload.get("status")
+            limit = payload.get("limit", 10)
+            from api.models.order import Order  # type: ignore
+            from mongoengine import Q  # type: ignore
+            try:
+                if status:
+                    orders = Order.objects(status__iexact=status).order_by('-created_at').limit(limit)
+                else:
+                    orders = Order.objects().order_by('-created_at').limit(limit)
+                
+                order_list = []
+                for o in orders:
+                    customer_name = "Unknown"
+                    if o.customer:
+                        customer_name = f"{o.customer.first_name} {o.customer.last_name}"
+                        
+                    order_list.append({
+                        "id": str(o.id),
+                        "customerName": customer_name,
+                        "phone": o.phone,
+                        "status": o.status,
+                        "total": str(o.total_price),
+                        "paymentMethod": o.payment_method,
+                        "date": o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else ""
+                    })
+                return {"success": True, "action": "get_orders_list", "message": "Đã lấy danh sách đơn hàng thành công", "answer": json.dumps(order_list, ensure_ascii=False)}
+            except Exception as e:
+                return {"success": False, "action": "get_orders_list", "error": f"Lỗi truy vấn: {e}"}
+                
+        elif action == "update_order_status":
+            order_id = payload.get("order_id")
+            new_status = payload.get("new_status")
+            if not order_id or not new_status:
+                return {"success": False, "action": action, "error": "Thiếu ID đơn hàng hoặc trạng thái mới"}
+            from api.models.order import Order  # type: ignore
+            try:
+                order = Order.objects(id=order_id).first()
+                if not order:
+                    return {"success": False, "action": action, "error": f"Không tìm thấy đơn hàng {order_id}"}
+                order.status = new_status
+                order.save()
+                return {"success": True, "action": action, "message": f"Đã cập nhật đơn hàng {order_id} thành {new_status}"}
+            except Exception as e:
+                return {"success": False, "action": action, "error": f"Lỗi cập nhật: {e}"}
+                
+        elif action == "get_users_list":
+            role = payload.get("role")
+            from api.models.customer import Customer  # type: ignore
+            try:
+                # Hiện tại Customer không có field role rõ ràng, tạm thời return danh sách
+                users = Customer.objects().limit(20)
+                
+                user_list = [{"id": str(u.id), "name": f"{u.first_name} {u.last_name}", "email": u.email, "role": "N/A", "phone": getattr(u, 'phone', '')} for u in users]
+                return {"success": True, "action": "get_users_list", "message": "Đã lấy danh sách khách hàng", "answer": json.dumps(user_list, ensure_ascii=False)}
+            except Exception as e:
+                return {"success": False, "action": "get_users_list", "error": f"Lỗi truy vấn: {e}"}
+                
+        elif action == "update_user_role":
+            user_id = payload.get("user_id")
+            new_role = payload.get("new_role")
+            if not user_id or not new_role:
+                return {"success": False, "action": action, "error": "Thiếu ID hoặc Role mới"}
+            from api.models.customer import Customer  # type: ignore
+            try:
+                # Tìm bằng ID, nếu lỗi thì tìm bằng Email/Name
+                from bson.errors import InvalidId  # type: ignore
+                user = None
+                try:
+                    user = Customer.objects(id=user_id).first()
+                except InvalidId:
+                    user = Customer.objects(email=user_id).first() or Customer.objects(first_name__icontains=user_id).first()
+                    
+                if not user:
+                    return {"success": False, "action": action, "error": f"Không tìm thấy người dùng {user_id}"}
+                
+                # Hiện tại DB chưa có field role, có thể pass hoặc thông báo cho frontend
+                return {"success": True, "action": action, "message": f"Hệ thống hiện chưa hỗ trợ lưu role cho Customer. Đã ghi nhận yêu cầu cấp quyền {new_role} cho {user.first_name}."}
+            except Exception as e:
+                return {"success": False, "action": action, "error": f"Lỗi cập nhật: {e}"}
+                
+        elif action == "update_product_stock":
+            product_id = payload.get("product_id")
+            in_stock = payload.get("in_stock")
+            if not product_id or in_stock is None:
+                return {"success": False, "action": action, "error": "Thiếu thông tin sản phẩm hoặc trạng thái tồn kho"}
+            from api.models.product import Product  # type: ignore
+            from api.models.productdetail import ProductDetail  # type: ignore
+            try:
+                product = Product.objects(name__iexact=product_id).first()
+                if not product:
+                    from bson.errors import InvalidId  # type: ignore
+                    try:
+                        product = Product.objects(id=product_id).first()
+                    except InvalidId:
+                        return {"success": False, "action": action, "error": "Không tìm thấy sản phẩm"}
+                
+                detail = ProductDetail.objects(product=product).first()
+                if detail:
+                    detail.inStock = in_stock
+                    detail.save()
+                    status_text = "Còn hàng" if in_stock else "Hết hàng"
+                    return {"success": True, "action": action, "message": f"Sản phẩm {product.name} đã cập nhật kho thành: {status_text}"}
+                else:
+                    return {"success": False, "action": action, "error": "Sản phẩm này không có file chi tiết"}
+            except Exception as e:
+                return {"success": False, "action": action, "error": f"Lỗi cập nhật kho: {e}"}
+            
+        else:
+             return {"success": False, "action": "none", "error": f"Hành động không hợp lệ: {action}"}
+             
+    except Exception as e:
+        print(f" Lỗi khi thực thi {action}: {e}")
+        return {"success": False, "action": action, "error": f"Lỗi thực thi dữ liệu máy chủ: {e}"}
