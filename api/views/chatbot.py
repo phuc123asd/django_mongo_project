@@ -110,7 +110,10 @@ def chatbot(request):
             "Khi thấy người dùng yêu cầu 'mở trang', 'chuyển đến', 'đi tới', hãy sử dụng tool navigate_page. "
             "QUAN TRỌNG: Khi người dùng muốn thêm/tạo sản phẩm mới (dù chưa cung cấp đủ thông tin), "
             "hãy GỌI NGAY tool add_product với những thông tin có sẵn (ít nhất truyền name nếu biết). "
-            "KHÔNG hỏi lại hay liệt kê yêu cầu — hệ thống sẽ tự hiện form để admin điền còn thiếu."
+            "KHÔNG hỏi lại hay liệt kê yêu cầu — hệ thống sẽ tự hiện form để admin điền còn thiếu. "
+            "QUAN TRỌNG: Khi người dùng muốn SỬA/CẬP NHẬT/CHỈNH SỬA sản phẩm (dù chỉ cung cấp ID hoặc tên), "
+            "hãy GỌI NGAY tool update_product với product_id tương ứng. "
+            "KHÔNG hỏi lại 'bạn muốn sửa gì' — hệ thống sẽ tự hiện form chứa dữ liệu hiện tại để admin chỉnh sửa."
         )
         
         if "biểu đồ" in question.lower() or "chart" in question.lower() or "vẽ" in question.lower():
