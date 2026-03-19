@@ -9,6 +9,11 @@ import cloudinary.uploader
 from api.utils.openai_tools import ADMIN_TOOLS
 import re
 from api.models.product import Product
+from api.models.productdetail import ProductDetail
+from api.models.order import Order
+from mongoengine import Q
+from mongoengine.errors import ValidationError
+from bson.errors import InvalidId
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -71,7 +76,6 @@ def chatbot(request):
         keyword = keyword_response.choices[0].message.content.strip()
 
         # Tìm kiếm bằng MongoEngine với phân biệt chữ hoa/thường (icontains)
-        from mongoengine import Q
         
         # Tìm các sản phẩm có contains trong tên hoặc danh mục
         results = Product.objects(
@@ -189,10 +193,6 @@ def chatbot(request):
                     if function_name == "update_product" and not is_form_submit:
                         product_id_query = function_args.get("product_id")
                         if product_id_query:
-                            from api.models.product import Product
-                            from api.models.productdetail import ProductDetail
-                            from bson.errors import InvalidId
-                            from mongoengine.errors import ValidationError
                             
                             product = Product.objects(name=product_id_query).first()
                             if not product:
@@ -232,15 +232,12 @@ def chatbot(request):
                     
                     # Render frontend card nếu AI muốn duyệt đơn hàng
                     if function_name == "approve_order" and not is_form_submit:
-                        from api.models.order import Order
-                        from api.models.product import Product
                         
                         order_ids = function_args.get("order_ids", [])
                         
                         if not order_ids:
                             orders = Order.objects(status='Đang Xử Lý').order_by('-created_at').limit(20)
                         else:
-                            from bson.errors import InvalidId
                             orders = []
                             for oid in order_ids:
                                 try:
