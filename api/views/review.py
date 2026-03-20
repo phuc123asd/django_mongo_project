@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from typing import Any, cast
 from mongoengine.errors import DoesNotExist, ValidationError
 from bson.errors import InvalidId
 from api.models.review import Review
@@ -26,6 +27,9 @@ from openai import OpenAI
 from django.conf import settings
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 def generate_ai_response_text(rating, comment, product_name):
     try:
@@ -86,7 +90,7 @@ Viết phản hồi ngay bây giờ.
 @api_view(['GET'])
 def get_reviews_by_product_id(request, product_id):
     try:
-        reviews = Review.objects.filter(product_id=product_id).order_by('-created_at')
+        reviews = _objects(Review).filter(product_id=product_id).order_by('-created_at')
         serializer = ReviewSerializer(reviews, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Exception as e:
@@ -105,7 +109,7 @@ def add_review(request):
         serializer = ReviewSerializer(data=data)
         if serializer.is_valid():
             # Chỉ lưu review, không tạo phản hồi tự động
-            review = serializer.save()
+            review = cast(Review, serializer.save())
             
             logger.info(f"Review created by user {customer.id} for product {review.product_id}")
             
@@ -129,7 +133,8 @@ def add_review_insecure(request):
         serializer = ReviewSerializer(data=data)
         if serializer.is_valid():
             # 1. Lưu review trước
-            review = serializer.save()
+            review = cast(Review, serializer.save())
+            review_id = str(getattr(review, "id", getattr(review, "pk", "")))
             logger.info(f"Review created insecurely for product {review.product_id}")
             
             # 2. --- BẮT ĐẦU ĐOẠN TỰ ĐỘNG TẠO PHẢN HỒI ---
@@ -139,17 +144,17 @@ def add_review_insecure(request):
                 ai_text = generate_ai_response_text(review.rating, review.comment, "sản phẩm")
                 
                 # Tạo và lưu một AdminResponse mới vào database
-                AdminResponse.objects.create(
-                    review_id=str(review.id),  # Liên kết với review vừa tạo
+                _objects(AdminResponse).create(
+                    review_id=review_id,  # Liên kết với review vừa tạo
                     response=ai_text,
                     admin_id='ai-assistant',
                     admin_name='AI Assistant',
                     response_type='ai'
                 )
-                logger.info(f"AI response auto-generated for review {review.id}")
+                logger.info(f"AI response auto-generated for review {review_id}")
             except Exception as ai_err:
                 # Nếu có lỗi trong quá trình tạo AI, chỉ log lỗi chứ không làm hỏng việc tạo review
-                logger.error(f"Failed to auto-generate AI response for review {review.id}: {ai_err}")
+                logger.error(f"Failed to auto-generate AI response for review {review_id}: {ai_err}")
             # 3. --- KẾT THÚC ĐOẠN TỰ ĐỘNG TẠO PHẢN HỒI ---
 
             # Trả về data của review vừa tạo

@@ -3,6 +3,7 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from typing import Any
 from api.models.admin_response import AdminResponse
 from api.serializers.admin_response import AdminResponseSerializer
 
@@ -12,6 +13,9 @@ from openai import OpenAI
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 # Khởi tạo OpenAI client
 openai_client = None
@@ -38,7 +42,8 @@ def generate_ai_response_text(review_rating, review_comment, product_name):
             max_tokens=150,
             temperature=0.7,
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else "Cảm ơn bạn đã đánh giá. Chúng tôi sẽ phản hồi sớm nhất."
     except Exception as e:
         logger.error(f"Error generating AI response: {e}")
         return "Cảm ơn bạn đã đánh giá. Phản hồi tự động đang gặp sự cố."
@@ -48,7 +53,7 @@ def generate_ai_response_text(review_rating, review_comment, product_name):
 def get_public_admin_responses(request, review_id):
     """Lấy tất cả phản hồi cho một review (công khai cho mọi người)."""
     try:
-        responses = AdminResponse.objects.filter(review_id=review_id).order_by('created_at')
+        responses = _objects(AdminResponse).filter(review_id=review_id).order_by('created_at')
         serializer = AdminResponseSerializer(responses, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Exception as e:
@@ -60,7 +65,7 @@ def get_public_admin_responses(request, review_id):
 def get_admin_responses(request, review_id):
     """Lấy tất cả phản hồi cho một review (admin only)."""
     try:
-        responses = AdminResponse.objects.filter(review_id=review_id).order_by('-created_at')
+        responses = _objects(AdminResponse).filter(review_id=review_id).order_by('-created_at')
         serializer = AdminResponseSerializer(responses, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Exception as e:
@@ -121,7 +126,7 @@ def generate_ai_response(request):
 def update_admin_response(request, response_id):
     """Cập nhật một phản hồi."""
     try:
-        response_obj = AdminResponse.objects.get(id=response_id)
+        response_obj = _objects(AdminResponse).get(id=response_id)
         response_obj.response = request.data.get('response')
         response_obj.response_type = 'manual' # Đánh dấu là đã chỉnh sửa thủ công
         response_obj.save()
@@ -138,7 +143,7 @@ def update_admin_response(request, response_id):
 def delete_admin_response(request, response_id):
     """Xóa một phản hồi."""
     try:
-        response_obj = AdminResponse.objects.get(id=response_id)
+        response_obj = _objects(AdminResponse).get(id=response_id)
         response_obj.delete()
         return Response({"message": "Đã xóa phản hồi thành công."}, status=status.HTTP_200_OK)
     except DoesNotExist:

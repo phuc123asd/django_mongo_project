@@ -1,5 +1,6 @@
 import json
 from openai import OpenAI
+from typing import Any, cast
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -16,6 +17,9 @@ from mongoengine.errors import ValidationError
 from bson.errors import InvalidId
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 @csrf_exempt
 def chatbot(request):
@@ -88,12 +92,13 @@ def chatbot(request):
             temperature=0,
             max_tokens=30
         )
-        keyword = keyword_response.choices[0].message.content.strip()
+        keyword_content = keyword_response.choices[0].message.content
+        keyword = keyword_content.strip() if keyword_content else ""
 
         # Tìm kiếm bằng MongoEngine với phân biệt chữ hoa/thường (icontains)
         
         # Tìm các sản phẩm có contains trong tên hoặc danh mục
-        results = Product.objects(
+        results = _objects(Product)(
             Q(name__icontains=keyword) | 
             Q(category__icontains=keyword) |
             Q(brand__icontains=keyword)
@@ -207,7 +212,7 @@ def chatbot(request):
                 response = client.chat.completions.create(
                     model="gpt-4o", # Model mạnh hơn xíu để xử lý chain lý luận
                     messages=messages,
-                    tools=ADMIN_TOOLS,
+                    tools=cast(Any, ADMIN_TOOLS),
                     tool_choice="auto",
                     parallel_tool_calls=False,
                     max_tokens=800,
@@ -217,13 +222,16 @@ def chatbot(request):
                 message = response.choices[0].message
                 
                 # Nếu AI trả về function call
-                if message.tool_calls:
+                tool_calls = getattr(message, "tool_calls", None)
+                if tool_calls:
                     messages.append(message)
-                    tool_call = message.tool_calls[0]
-                    function_name = tool_call.function.name
+                    tool_call: Any = tool_calls[0]
+                    function_obj: Any = getattr(tool_call, "function", None)
+                    function_name = getattr(function_obj, "name", "")
+                    function_arguments = getattr(function_obj, "arguments", "{}")
                     
                     try:
-                        function_args = json.loads(tool_call.function.arguments)
+                        function_args = json.loads(function_arguments)
                     except Exception as e:
                         function_args = {}
                         print(f"[TOOL PARSE ERROR] Lỗi phân tích JSON Argument: {e}")
@@ -245,15 +253,15 @@ def chatbot(request):
                         product_id_query = function_args.get("product_id")
                         if product_id_query:
                             
-                            product = Product.objects(name=product_id_query).first()
+                            product = _objects(Product)(name=product_id_query).first()
                             if not product:
                                 try:
-                                    product = Product.objects(id=product_id_query).first()
+                                    product = _objects(Product)(id=product_id_query).first()
                                 except (InvalidId, ValidationError):
                                     pass
                                     
                             if product:
-                                detail = ProductDetail.objects(product=product).first()
+                                detail = _objects(ProductDetail)(product=product).first()
                                 prefill = {
                                     "id": str(product.id),
                                     "name": function_args.get("name", product.name),
@@ -287,12 +295,12 @@ def chatbot(request):
                         order_ids = function_args.get("order_ids", [])
                         
                         if not order_ids:
-                            orders = Order.objects(status='Đang Xử Lý').order_by('-created_at').limit(20)
+                            orders = _objects(Order)(status='Đang Xử Lý').order_by('-created_at').limit(20)
                         else:
                             orders = []
                             for oid in order_ids:
                                 try:
-                                    o = Order.objects(id=oid).first()
+                                    o = _objects(Order)(id=oid).first()
                                     if o:
                                         orders.append(o)
                                 except (InvalidId, Exception):
@@ -323,7 +331,7 @@ def chatbot(request):
                                 product_name = "Sản phẩm"
                                 if item.product_id:
                                     try:
-                                        p = Product.objects(id=item.product_id).first()
+                                        p = _objects(Product)(id=item.product_id).first()
                                         if p:
                                             product_name = p.name
                                     except Exception:

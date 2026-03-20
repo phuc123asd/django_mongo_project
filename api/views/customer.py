@@ -3,16 +3,20 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from typing import Any
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from api.models.customer import Customer
 from api.serializers.customer import CustomerSerializer
 from api.decorators.decorators import require_session_auth
-from mongoengine.errors import DoesNotExist
+from mongoengine.errors import DoesNotExist, ValidationError
 from bson import ObjectId
 import logging  # Để log
 
 logger = logging.getLogger(__name__)
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 # --- REGISTER ---
 @api_view(['POST'])
@@ -28,7 +32,7 @@ def api_register(request):
     if not email or not password:
         return Response({'error': 'Vui lòng cung cấp cả email và mật khẩu.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if Customer.objects(email=email).first():
+    if _objects(Customer)(email=email).first():
         return Response({'error': 'Email này đã được sử dụng.'}, status=status.HTTP_409_CONFLICT)
 
     try:
@@ -70,7 +74,7 @@ def api_login(request):
     if not email or not password:
         return Response({'error': 'Vui lòng cung cấp cả email và mật khẩu.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    customer = Customer.objects(email=email).first()
+    customer = _objects(Customer)(email=email).first()
     
     # So sánh mật khẩu dạng văn bản thuần
     if not customer or password != customer.password:
@@ -106,7 +110,7 @@ def get_customer(request, customer_id):
     try:
         # Sửa: Truy vấn bằng 'id' (MongoEngine tự động chuyển str thành ObjectId)
         # Sử dụng .get() để khớp chính xác (ném DoesNotExist nếu không tìm thấy)
-        customer = Customer.objects.get(id=customer_id)
+        customer = _objects(Customer).get(id=customer_id)
         
         serializer = CustomerSerializer(customer)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -127,7 +131,7 @@ def update_customer(request, customer_id):
     API endpoint để cập nhật thông tin khách hàng.
     """
     try:
-        customer = Customer.objects.get(id=customer_id)
+        customer = _objects(Customer).get(id=customer_id)
         
         # Truyền instance vào serializer
         serializer = CustomerSerializer(instance=customer, data=request.data, partial=True)
@@ -174,7 +178,7 @@ def get_all_customers(request):
         province = request.query_params.get('province', None)
         
         # Bắt đầu với queryset tất cả khách hàng
-        customers = Customer.objects.all()
+        customers = _objects(Customer).all()
         
         # Áp dụng bộ lọc nếu có
         if city:

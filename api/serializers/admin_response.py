@@ -1,7 +1,11 @@
 # api/serializers/admin_response.py
 
 from rest_framework import serializers
+from typing import Any
 from api.models.admin_response import AdminResponse
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 class AdminResponseSerializer(serializers.Serializer):
     id = serializers.SerializerMethodField()
@@ -9,8 +13,8 @@ class AdminResponseSerializer(serializers.Serializer):
     response = serializers.CharField()
     admin_id = serializers.CharField()
     admin_name = serializers.CharField()
-    created_at = serializers.DateTimeField(format='iso-8601', read_only=True)
-    updated_at = serializers.DateTimeField(format='iso-8601', read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
     response_type = serializers.CharField(required=False, default='manual')
 
     def get_id(self, obj):
@@ -20,5 +24,5 @@ class AdminResponseSerializer(serializers.Serializer):
         """
         Tạo và trả về một instance `AdminResponse` mới
         """
-        response = AdminResponse.objects.create(**validated_data)
+        response = _objects(AdminResponse).create(**validated_data)
         return response

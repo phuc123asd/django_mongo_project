@@ -1,10 +1,15 @@
 # api/serializers/order.py
 from rest_framework import serializers
+from typing import Any
 
 from api.models.order import Order
 from api.models.product import Product
 from api.models.customer import Customer
 from api.serializers.customer import CustomerSerializer
+
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 
 def _extract_product_id(item):
@@ -72,7 +77,7 @@ class OrderSerializer(serializers.Serializer):
     def get_id(self, obj):
         return str(obj.id)
 
-    def get_customer(self, obj):
+    def get_customer(self, obj) -> Any:
         return str(obj.customer.id)
 
     def get_total_price(self, obj):
@@ -83,19 +88,20 @@ class OrderDetailSerializer(OrderSerializer):
     customer = serializers.SerializerMethodField()
     items = serializers.SerializerMethodField()
 
-    def get_customer(self, obj):
+    def get_customer(self, obj) -> Any:
+        customer_id: Any = "Không xác định"
         try:
             customer_ref = getattr(obj, "customer", None)
             customer_id = getattr(customer_ref, "id", customer_ref)
-            customer_instance = Customer.objects.get(id=customer_id)
+            customer_instance = _objects(Customer)(id=customer_id).first()
+            if not customer_instance:
+                return {
+                    "id": str(customer_id),
+                    "email": "Khách hàng không tồn tại",
+                    "name": "Khách hàng không tồn tại",
+                }
             serializer = CustomerSerializer(customer_instance)
             return serializer.data
-        except Customer.DoesNotExist:
-            return {
-                "id": str(customer_id),
-                "email": "Khách hàng không tồn tại",
-                "name": "Khách hàng không tồn tại",
-            }
         except Exception:
             return {
                 "id": "Không xác định",
@@ -148,7 +154,7 @@ class CreateOrderSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Mỗi sản phẩm phải có 'product_id'.")
             product_ids.append(product_id)
 
-        existing_products = {str(p.id): p for p in Product.objects.filter(id__in=product_ids)}
+        existing_products = {str(p.id): p for p in _objects(Product).filter(id__in=product_ids)}
 
         for item in items:
             product_id = item.get("product_id") or item.get("product")

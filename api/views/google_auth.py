@@ -1,10 +1,14 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
+from typing import Any
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from api.models.customer import Customer
 from decouple import config
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 # Client ID từ Google Console
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
@@ -40,7 +44,7 @@ def google_login(request):
             picture = idinfo.get('picture', '')
             
             # Kiem tra xem user da ton tai chua
-            customer = Customer.objects(email=email).first()
+            customer = _objects(Customer)(email=email).first()
             is_new = False
             if not customer:
                 # Tao user moi neu chua ton tai

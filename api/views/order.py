@@ -4,9 +4,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from mongoengine.errors import DoesNotExist
+from typing import Any, cast
 from api.models.order import Order
-from api.serializers.order import OrderSerializer
 from mongoengine.errors import DoesNotExist, ValidationError
 from api.serializers.order import OrderSerializer, OrderDetailSerializer, CreateOrderSerializer # Thêm CreateOrderSerializer vào import
 from api.models.product import Product
@@ -15,6 +14,9 @@ from api.models.order import OrderItem
 from api.models.review import Review
 from api.serializers.review import ReviewSerializer
 from api.serializers.customer import CustomerSerializer
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 @api_view(['GET'])
 def get_all_reviews(request):
@@ -25,7 +27,7 @@ def get_all_reviews(request):
     """
     try:
         # Lấy tất cả các đánh giá, sắp xếp theo ngày tạo mới nhất
-        reviews = Review.objects.all().order_by('-created_at')
+        reviews = _objects(Review).all().order_by('-created_at')
         
         # Sử dụng many=True vì chúng ta đang serialize một danh sách các đối tượng
         serializer = ReviewSerializer(reviews, many=True)
@@ -40,14 +42,14 @@ def get_all_reviews(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def get_orders_by_customer(request, customer_id):
+def get_orders_by_customer_authenticated(request, customer_id):
     """
     API endpoint để lấy danh sách đơn hàng của một khách hàng.
     Yêu cầu xác thực người dùng.
     """
     try:
         # Lấy tất cả đơn hàng của khách hàng, sắp xếp theo ngày tạo mới nhất
-        orders = Order.objects.filter(customer=customer_id).order_by('-created_at')
+        orders = _objects(Order).filter(customer=customer_id).order_by('-created_at')
         
         # Sử dụng many=True vì chúng ta đang serialize một danh sách các đối tượng
         serializer = OrderSerializer(orders, many=True)
@@ -67,7 +69,7 @@ def get_orders_by_customer(request, customer_id):
     CẢNH BÁO: View này KHÔNG YÊU CẦU XÁC THỰC.
     """
     try:
-        orders = Order.objects.filter(customer=customer_id).order_by('-created_at')
+        orders = _objects(Order).filter(customer=customer_id).order_by('-created_at')
         serializer = OrderSerializer(orders, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -84,7 +86,7 @@ def get_order_detail(request, order_id):
     CẢNH BÁO: View này KHÔNG YÊU CẦU XÁC THỰC.
     """
     try:
-        order = Order.objects.get(id=order_id)
+        order = _objects(Order).get(id=order_id)
         serializer = OrderSerializer(order, many=False)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -122,8 +124,8 @@ def create_order(request):
 
     try:
         # Tìm customer dựa trên ID được gửi lên
-        customer = Customer.objects.get(id=customer_id)
-    except Customer.DoesNotExist:
+        customer = _objects(Customer).get(id=customer_id)
+    except DoesNotExist:
         return Response(
             {"error": f"Không tìm thấy khách hàng với ID: {customer_id}"},
             status=status.HTTP_404_NOT_FOUND
@@ -134,24 +136,24 @@ def create_order(request):
 
     serializer = CreateOrderSerializer(data=order_data)
     if serializer.is_valid():
-        validated_data = serializer.validated_data
-        order_items_data = validated_data['items']
+        validated_data = cast(dict[str, Any], serializer.validated_data)
+        order_items_data = cast(list[dict[str, Any]], validated_data.get('items', []))
 
         # Tính tổng giá tiền theo cấu trúc item mới (product_id + quantity + unit_price)
         total_price = sum(float(item['unit_price']) * item['quantity'] for item in order_items_data)
 
         # Tạo đối tượng Order
         try:
-            order = Order.objects.create(
+            order = _objects(Order).create(
                 customer=customer, # Sử dụng customer object đã lấy ở trên
                 items=[OrderItem(**item) for item in order_items_data],
                 total_price=total_price,
-                payment_method=validated_data['payment_method'],
-                shipping_address=validated_data['shipping_address'],
-                city=validated_data['city'],
-                province=validated_data['province'],
-                postal_code=validated_data['postal_code'],
-                phone=validated_data['phone'],
+                payment_method=validated_data.get('payment_method'),
+                shipping_address=validated_data.get('shipping_address'),
+                city=validated_data.get('city'),
+                province=validated_data.get('province'),
+                postal_code=validated_data.get('postal_code'),
+                phone=validated_data.get('phone'),
                 status='Đang Xử Lý'
             )
 
@@ -176,7 +178,7 @@ def get_all_orders(request):
     API endpoint để lấy tất cả các đơn hàng.
     """
     try:
-        orders = Order.objects.no_dereference().all()
+        orders = _objects(Order).no_dereference().all()
         serializer = OrderDetailSerializer(orders, many=True)
         
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -208,7 +210,7 @@ def update_order_status(request, order_id):
     
     try:
         # Tìm đơn hàng
-        order = Order.objects.get(id=order_id)
+        order = _objects(Order).get(id=order_id)
         
         # Cập nhật trạng thái
         order.status = new_status

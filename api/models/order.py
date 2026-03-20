@@ -2,6 +2,7 @@
 from mongoengine import Document, fields, EmbeddedDocument
 from api.models.customer import Customer
 from datetime import datetime
+from typing import Any
 
 
 class OrderItem(EmbeddedDocument):
@@ -45,4 +46,7 @@ class Order(Document):
         return super(Order, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"Order {self.id} by {self.customer.email if self.customer else 'Unknown'}"
+        order_id = getattr(self, "id", None) or getattr(self, "pk", "Unknown")
+        customer_obj: Any = getattr(self, "customer", None)
+        customer_email = getattr(customer_obj, "email", "Unknown")
+        return f"Order {order_id} by {customer_email}"

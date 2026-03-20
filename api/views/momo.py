@@ -8,6 +8,7 @@ import uuid
 import hmac
 import hashlib
 from datetime import datetime
+from typing import Any
 
 import httpx
 from decouple import config
@@ -18,14 +19,21 @@ from mongoengine.errors import DoesNotExist, ValidationError
 
 from api.models.order import Order
 
-# ── Cấu hình MoMo (đọc từ .env) ──────────────────────────────────────────────
-MOMO_PARTNER_CODE = config('MOMO_PARTNER_CODE', default='MOMO')
-MOMO_ACCESS_KEY   = config('MOMO_ACCESS_KEY',   default='F8BBA842ECF85')
-MOMO_SECRET_KEY   = config('MOMO_SECRET_KEY',   default='K951B6PE1waDMi640xX08PD3vg6EkVlz')
-MOMO_ENDPOINT     = config('MOMO_ENDPOINT',     default='https://test-payment.momo.vn/v2/gateway/api/create')
+def _env_str(name: str, default: str) -> str:
+    value = config(name, default=default)
+    return str(value)
 
-FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
-BACKEND_URL  = config('BACKEND_URL',  default='http://127.0.0.1:8000')
+def _objects(model: Any) -> Any:
+    return model.objects
+
+# ── Cấu hình MoMo (đọc từ .env) ──────────────────────────────────────────────
+MOMO_PARTNER_CODE = _env_str('MOMO_PARTNER_CODE', 'MOMO')
+MOMO_ACCESS_KEY   = _env_str('MOMO_ACCESS_KEY', 'F8BBA842ECF85')
+MOMO_SECRET_KEY   = _env_str('MOMO_SECRET_KEY', 'K951B6PE1waDMi640xX08PD3vg6EkVlz')
+MOMO_ENDPOINT     = _env_str('MOMO_ENDPOINT', 'https://test-payment.momo.vn/v2/gateway/api/create')
+
+FRONTEND_URL = _env_str('FRONTEND_URL', 'http://localhost:3000')
+BACKEND_URL  = _env_str('BACKEND_URL', 'http://127.0.0.1:8000')
 
 # Tỉ giá quy đổi USD → VND (chỉnh sửa nếu hệ thống đã dùng VND)
 USD_TO_VND = config('USD_TO_VND', default=25000, cast=int)
@@ -78,7 +86,7 @@ def create_momo_payment(request):
         return Response({'error': 'Thiếu order_id'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        order = Order.objects.get(id=order_id)
+        order = _objects(Order).get(id=order_id)
     except (DoesNotExist, ValidationError):
         return Response({'error': 'Không tìm thấy đơn hàng'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -143,7 +151,7 @@ def create_momo_payment(request):
         print(f"[MoMo] Bắt đầu tạo thanh toán cho order_id: {order_id}")
         print(f"[MoMo] Payload gửi lên: {payload}")
         with httpx.Client(timeout=10.0) as client:
-            resp = client.post(MOMO_ENDPOINT, json=payload)
+            resp = client.post(str(MOMO_ENDPOINT), json=payload)
         result = resp.json()
         print(f"[MoMo] Response từ MoMo: {result}")
 
@@ -210,7 +218,7 @@ def momo_ipn(request):
     result_code = data.get('resultCode')
 
     try:
-        order = Order.objects.get(id=original_order_id)
+        order = _objects(Order).get(id=original_order_id)
         if result_code == 0:
             print(f"[MoMo-IPN] Thanh toán thành công cho order_id: {original_order_id}")
             order.payment_status = 'paid'
@@ -263,7 +271,7 @@ def confirm_momo_payment(request):
     result_code = int(data.get('resultCode', -1))
 
     try:
-        order = Order.objects.get(id=original_order_id)
+        order = _objects(Order).get(id=original_order_id)
         order.payment_status = 'paid' if result_code == 0 else 'failed'
         order.save()
         print(f"[MoMo-Confirm] Cập nhật trạng thái đơn hàng {original_order_id}: {order.payment_status}")
@@ -281,7 +289,7 @@ def get_payment_status(request, order_id):
     Frontend gọi để kiểm tra payment_status sau khi redirect về từ MoMo.
     """
     try:
-        order = Order.objects.get(id=order_id)
+        order = _objects(Order).get(id=order_id)
         return Response(
             {
                 'order_id':       str(order.id),

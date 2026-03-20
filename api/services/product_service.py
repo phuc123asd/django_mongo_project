@@ -2,8 +2,12 @@ from api.models.product import Product
 from api.models.productdetail import ProductDetail
 from mongoengine.errors import ValidationError, NotUniqueError
 from bson.errors import InvalidId
+from typing import Any
 import cloudinary.uploader
 import json
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 
 def _normalize_specifications(specifications_raw):
@@ -91,9 +95,9 @@ def add_product(payload):
     """
     Hàm này nhận payload đã có đầy đủ thông tin từ GPT và lưu vào DB.
     """
+    name = payload.get('name')
     try:
         # 1. Trích xuất dữ liệu từ payload
-        name = payload.get('name')
         price = payload.get('price')
         original_price = payload.get('originalPrice')
         
@@ -152,7 +156,7 @@ def add_product(payload):
             "success": True,
             "action": "add_product",
             "message": f"Đã thêm sản phẩm '{name}' thành công.",
-            "product_id": str(product.id),
+            "product_id": str(getattr(product, "id", getattr(product, "pk", ""))),
             "images": image_urls  # <-- Trả về để frontend hiển thị
         }
         
@@ -178,9 +182,9 @@ def delete_product(product_id):
     """
 
     # 1. Tìm sản phẩm
-    product = Product.objects(name=product_id).first()
+    product = _objects(Product)(name=product_id).first()
     if not product:
-        product = Product.objects(id=product_id).first()
+        product = _objects(Product)(id=product_id).first()
 
     if not product:
         return {"success": False, "error": "Không tìm thấy sản phẩm"}
@@ -196,7 +200,7 @@ def delete_product(product_id):
         image_urls.extend(product.images)
 
     # Ảnh từ ProductDetail
-    details = ProductDetail.objects(product=product)
+    details = _objects(ProductDetail)(product=product)
     for d in details:
         if hasattr(d, "image") and d.image:
             image_urls.append(d.image)
@@ -236,10 +240,10 @@ def update_product(payload):
             }
         
         # 2. Find the product by name or ID
-        product_to_update = Product.objects(name=product_id).first()
+        product_to_update = _objects(Product)(name=product_id).first()
         if not product_to_update:
             try:
-                product_to_update = Product.objects(id=product_id).first()
+                product_to_update = _objects(Product)(id=product_id).first()
             except InvalidId:
                 return {
                     "success": False,
@@ -255,7 +259,7 @@ def update_product(payload):
             }
         
         # 3. Get the product detail
-        product_detail = ProductDetail.objects(product=product_to_update).first()
+        product_detail = _objects(ProductDetail)(product=product_to_update).first()
         if not product_detail:
             return {
                 "success": False,
@@ -368,7 +372,7 @@ def update_product(payload):
                 "success": True,
                 "action": "update_product",
                 "message": f"Đã cập nhật thành công các trường: {fields_str} cho sản phẩm '{product_to_update.name}'.",
-                "product_id": str(product_to_update.id)
+                "product_id": str(getattr(product_to_update, "id", getattr(product_to_update, "pk", "")))
             }
         else:
             return {

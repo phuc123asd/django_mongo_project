@@ -1,11 +1,15 @@
 from datetime import datetime, timedelta
 from django.db.models import Sum, Count, Avg, Max, Min
+from typing import Any
 from api.models.order import Order, OrderItem
 from api.models.product import Product
 from api.models.customer import Customer
 from collections import defaultdict
 import calendar
 import json
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 class OrderStatisticsService:
     """
@@ -28,7 +32,7 @@ class OrderStatisticsService:
         try:
             # Đếm tổng số đơn hàng
             print(f"[STATS_SERVICE] Đếm tổng số đơn hàng...")
-            total_orders = Order.objects.count()
+            total_orders = _objects(Order).count()
             print(f"[STATS_SERVICE] Tổng số đơn hàng: {total_orders}")
             
             # Tính tổng doanh thu
@@ -36,7 +40,7 @@ class OrderStatisticsService:
             revenue_pipeline = [
                 {"$group": {"_id": None, "total": {"$sum": "$total_price"}}}
             ]
-            revenue_result = list(Order.objects.aggregate(revenue_pipeline))
+            revenue_result = list(_objects(Order).aggregate(revenue_pipeline))
             
             if revenue_result:
                 revenue_value = revenue_result[0]['total']
@@ -55,7 +59,7 @@ class OrderStatisticsService:
             avg_pipeline = [
                 {"$group": {"_id": None, "avg": {"$avg": "$total_price"}}}
             ]
-            avg_result = list(Order.objects.aggregate(avg_pipeline))
+            avg_result = list(_objects(Order).aggregate(avg_pipeline))
             
             if avg_result:
                 avg_value = avg_result[0]['avg']
@@ -74,7 +78,7 @@ class OrderStatisticsService:
             status_stats = {}
             for status in Order.STATUS_CHOICES:
                 print(f"[STATS_SERVICE] Đếm đơn hàng với trạng thái: {status}")
-                count = Order.objects(status=status).count()
+                count = _objects(Order)(status=status).count()
                 status_stats[status] = {
                     'count': count,
                     'percentage': round(count / total_orders * 100, 2) if total_orders > 0 else 0
@@ -87,14 +91,14 @@ class OrderStatisticsService:
             # Đơn hàng hôm nay
             print(f"[STATS_SERVICE] Đếm đơn hàng hôm nay...")
             today_start = self.today.replace(hour=0, minute=0, second=0, microsecond=0)
-            today_orders = Order.objects(created_at__gte=today_start).count()
+            today_orders = _objects(Order)(created_at__gte=today_start).count()
             print(f"[STATS_SERVICE] Đơn hàng hôm nay: {today_orders}")
             
             # Đơn hàng hôm qua
             print(f"[STATS_SERVICE] Đếm đơn hàng hôm qua...")
             yesterday_start = self.yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
             yesterday_end = self.today.replace(hour=0, minute=0, second=0, microsecond=0)
-            yesterday_orders = Order.objects(
+            yesterday_orders = _objects(Order)(
                 created_at__gte=yesterday_start,
                 created_at__lt=yesterday_end
             ).count()
@@ -102,12 +106,12 @@ class OrderStatisticsService:
             
             # Đơn hàng tuần này
             print(f"[STATS_SERVICE] Đếm đơn hàng tuần này...")
-            this_week_orders = Order.objects(created_at__gte=self.last_week).count()
+            this_week_orders = _objects(Order)(created_at__gte=self.last_week).count()
             print(f"[STATS_SERVICE] Đơn hàng tuần này: {this_week_orders}")
             
             # Đơn hàng tháng này
             print(f"[STATS_SERVICE] Đếm đơn hàng tháng này...")
-            this_month_orders = Order.objects(created_at__gte=self.last_month).count()
+            this_month_orders = _objects(Order)(created_at__gte=self.last_month).count()
             print(f"[STATS_SERVICE] Đơn hàng tháng này: {this_month_orders}")
             
             # Chuẩn bị kết quả
@@ -161,7 +165,7 @@ class OrderStatisticsService:
                 }},
                 {"$sort": {"_id": 1}}
             ]
-            daily_data = list(Order.objects.aggregate(daily_pipeline))
+            daily_data = list(_objects(Order).aggregate(daily_pipeline))
             
             # Chuyển đổi kết quả sang định dạng mong muốn
             daily_revenue = {}
@@ -187,7 +191,7 @@ class OrderStatisticsService:
                 }},
                 {"$sort": {"_id": 1}}
             ]
-            weekly_data = list(Order.objects.aggregate(weekly_pipeline))
+            weekly_data = list(_objects(Order).aggregate(weekly_pipeline))
             
             weekly_revenue = {}
             weekly_orders = {}
@@ -209,7 +213,7 @@ class OrderStatisticsService:
                 }},
                 {"$sort": {"_id": 1}}
             ]
-            monthly_data = list(Order.objects.aggregate(monthly_pipeline))
+            monthly_data = list(_objects(Order).aggregate(monthly_pipeline))
             
             monthly_revenue = {}
             monthly_orders = {}
@@ -229,7 +233,7 @@ class OrderStatisticsService:
                 {"$match": {"created_at": {"$gte": previous_start_date, "$lt": start_date}}},
                 {"$group": {"_id": None, "total": {"$sum": "$total_price"}}}
             ]
-            previous_result = list(Order.objects.aggregate(previous_pipeline))
+            previous_result = list(_objects(Order).aggregate(previous_pipeline))
             
             # --- SỬA LỖI CHÍNH ---
             if previous_result:
@@ -252,7 +256,7 @@ class OrderStatisticsService:
                 },
                 'previous_period': {
                     'total_revenue': previous_total,
-                    'total_orders': len(list(Order.objects.aggregate([
+                    'total_orders': len(list(_objects(Order).aggregate([
                         {"$match": {"created_at": {"$gte": previous_start_date, "$lt": start_date}}},
                         {"$count": "total"}
                     ]))),
@@ -297,7 +301,7 @@ class OrderStatisticsService:
                 }},
                 {"$sort": {"revenue": -1}}
             ]
-            province_data = list(Order.objects.aggregate(province_pipeline))
+            province_data = list(_objects(Order).aggregate(province_pipeline))
             
             province_stats = {}
             for item in province_data:
@@ -322,7 +326,7 @@ class OrderStatisticsService:
                 }},
                 {"$sort": {"revenue": -1}}
             ]
-            city_data = list(Order.objects.aggregate(city_pipeline))
+            city_data = list(_objects(Order).aggregate(city_pipeline))
             
             city_stats = {}
             for item in city_data:
@@ -386,12 +390,12 @@ class OrderStatisticsService:
                 {"$sort": {"revenue": -1}}
             ]
             
-            product_stats = list(Order.objects.aggregate(product_pipeline))
+            product_stats = list(_objects(Order).aggregate(product_pipeline))
             print(f"[STATS_SERVICE] Đã phân tích {len(product_stats)} sản phẩm")
             
             # Lấy thông tin chi tiết sản phẩm
             product_ids = [normalize_product_id(item['_id']) for item in product_stats]
-            products = Product.objects(id__in=product_ids)
+            products = _objects(Product)(id__in=product_ids)
             
             product_details = {}
             for product in products:
@@ -474,12 +478,12 @@ class OrderStatisticsService:
                 {"$sort": {"total_revenue": -1}}
             ]
             
-            customer_stats = list(Order.objects.aggregate(customer_pipeline))
+            customer_stats = list(_objects(Order).aggregate(customer_pipeline))
             print(f"[STATS_SERVICE] Đã phân tích {len(customer_stats)} khách hàng")
             
             # Lấy thông tin chi tiết khách hàng
             customer_ids = [item['_id'] for item in customer_stats]
-            customers = Customer.objects(id__in=customer_ids)
+            customers = _objects(Customer)(id__in=customer_ids)
             
             customer_details = {}
             for customer in customers:
@@ -551,3 +555,65 @@ class OrderStatisticsService:
             import traceback
             traceback.print_exc()
             raise
+
+    def _get_category_performance(self, product_stats, product_details):
+        category_stats = defaultdict(lambda: {"quantity": 0, "revenue": 0.0, "orders_count": 0})
+        for item in product_stats:
+            raw_id = item.get("_id")
+            product_id = str(getattr(raw_id, "id", raw_id))
+            details = product_details.get(product_id, {})
+            category = details.get("category", "Unknown")
+
+            revenue_value = item.get("revenue", 0)
+            try:
+                revenue = float(revenue_value.to_decimal())
+            except AttributeError:
+                revenue = float(revenue_value or 0)
+
+            category_stats[category]["quantity"] += int(item.get("quantity", 0))
+            category_stats[category]["revenue"] += revenue
+            category_stats[category]["orders_count"] += int(item.get("orders_count", 0))
+
+        result = []
+        for category, values in category_stats.items():
+            result.append(
+                {
+                    "category": category,
+                    "quantity": values["quantity"],
+                    "revenue": round(values["revenue"], 2),
+                    "orders_count": values["orders_count"],
+                }
+            )
+        result.sort(key=lambda x: x["revenue"], reverse=True)
+        return result
+
+    def _get_brand_performance(self, product_stats, product_details):
+        brand_stats = defaultdict(lambda: {"quantity": 0, "revenue": 0.0, "orders_count": 0})
+        for item in product_stats:
+            raw_id = item.get("_id")
+            product_id = str(getattr(raw_id, "id", raw_id))
+            details = product_details.get(product_id, {})
+            brand = details.get("brand", "Unknown")
+
+            revenue_value = item.get("revenue", 0)
+            try:
+                revenue = float(revenue_value.to_decimal())
+            except AttributeError:
+                revenue = float(revenue_value or 0)
+
+            brand_stats[brand]["quantity"] += int(item.get("quantity", 0))
+            brand_stats[brand]["revenue"] += revenue
+            brand_stats[brand]["orders_count"] += int(item.get("orders_count", 0))
+
+        result = []
+        for brand, values in brand_stats.items():
+            result.append(
+                {
+                    "brand": brand,
+                    "quantity": values["quantity"],
+                    "revenue": round(values["revenue"], 2),
+                    "orders_count": values["orders_count"],
+                }
+            )
+        result.sort(key=lambda x: x["revenue"], reverse=True)
+        return result

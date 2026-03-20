@@ -1,11 +1,16 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from typing import Any
 from bson import ObjectId
 from api.models.contact import Contact
 from api.serializers.contact import ContactSerializer, ContactListSerializer
 from django.core.mail import send_mail
 from django.conf import settings
+from mongoengine.errors import DoesNotExist
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 @api_view(['POST'])
 def create_contact(request):
@@ -34,7 +39,7 @@ def contact_list(request):
     Lấy danh sách tất cả contact (cho admin)
     GET: /api/contact/
     """
-    contacts = Contact.objects.all().order_by('-created_at')
+    contacts = _objects(Contact).all().order_by('-created_at')
     serializer = ContactListSerializer(contacts, many=True)
     return Response({
         'success': True,
@@ -50,8 +55,8 @@ def contact_detail(request, contact_id):
     GET: /api/contact/<contact_id>/
     """
     try:
-        contact = Contact.objects.get(id=ObjectId(contact_id))
-    except Contact.DoesNotExist:
+        contact = _objects(Contact).get(id=ObjectId(contact_id))
+    except DoesNotExist:
         return Response({
             'success': False,
             'message': 'Không tìm thấy tin nhắn'
@@ -76,8 +81,8 @@ def update_contact(request, contact_id):
     PUT/PATCH: /api/contact/<contact_id>/
     """
     try:
-        contact = Contact.objects.get(id=ObjectId(contact_id))
-    except Contact.DoesNotExist:
+        contact = _objects(Contact).get(id=ObjectId(contact_id))
+    except DoesNotExist:
         return Response({
             'success': False,
             'message': 'Không tìm thấy tin nhắn'
@@ -147,13 +152,13 @@ def delete_contact(request, contact_id):
     DELETE: /api/contact/<contact_id>/
     """
     try:
-        contact = Contact.objects.get(id=ObjectId(contact_id))
+        contact = _objects(Contact).get(id=ObjectId(contact_id))
         contact.delete()
         return Response({
             'success': True,
             'message': 'Xóa thành công'
         }, status=status.HTTP_200_OK)
-    except Contact.DoesNotExist:
+    except DoesNotExist:
         return Response({
             'success': False,
             'message': 'Không tìm thấy tin nhắn'

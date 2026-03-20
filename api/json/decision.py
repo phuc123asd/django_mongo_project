@@ -1,7 +1,14 @@
 import json
+from typing import Any
 from api.services.product_service import add_product, update_product, delete_product  # type: ignore
 from api.services.order_service import approve_multiple_orders  # type: ignore
 from api.services.order_statistics_service import OrderStatisticsService  # type: ignore
+
+def _objects(model: Any) -> Any:
+    """
+    MongoEngine exposes `objects` dynamically; help Pylance understand this access.
+    """
+    return model.objects
 
 def handle_admin_command(ai_response_string):
     try:
@@ -314,9 +321,9 @@ def execute_tool_call(action, payload):
             from mongoengine import Q  # type: ignore
             try:
                 if status:
-                    orders = Order.objects(status__iexact=status).order_by('-created_at').limit(limit)
+                    orders = _objects(Order)(status__iexact=status).order_by('-created_at').limit(limit)
                 else:
-                    orders = Order.objects().order_by('-created_at').limit(limit)
+                    orders = _objects(Order)().order_by('-created_at').limit(limit)
                 
                 order_list = []
                 for o in orders:
@@ -344,7 +351,7 @@ def execute_tool_call(action, payload):
                 return {"success": False, "action": action, "error": "Thiếu ID đơn hàng hoặc trạng thái mới"}
             from api.models.order import Order  # type: ignore
             try:
-                order = Order.objects(id=order_id).first()
+                order = _objects(Order)(id=order_id).first()
                 if not order:
                     return {"success": False, "action": action, "error": f"Không tìm thấy đơn hàng {order_id}"}
                 order.status = new_status
@@ -358,7 +365,7 @@ def execute_tool_call(action, payload):
             from api.models.customer import Customer  # type: ignore
             try:
                 # Hiện tại Customer không có field role rõ ràng, tạm thời return danh sách
-                users = Customer.objects().limit(20)
+                users = _objects(Customer)().limit(20)
                 
                 user_list = [{"id": str(u.id), "name": f"{u.first_name} {u.last_name}", "email": u.email, "role": "N/A", "phone": getattr(u, 'phone', '')} for u in users]
                 return {"success": True, "action": "get_users_list", "message": "Đã lấy danh sách khách hàng", "answer": json.dumps(user_list, ensure_ascii=False)}
@@ -376,9 +383,9 @@ def execute_tool_call(action, payload):
                 from bson.errors import InvalidId  # type: ignore
                 user = None
                 try:
-                    user = Customer.objects(id=user_id).first()
+                    user = _objects(Customer)(id=user_id).first()
                 except InvalidId:
-                    user = Customer.objects(email=user_id).first() or Customer.objects(first_name__icontains=user_id).first()
+                    user = _objects(Customer)(email=user_id).first() or _objects(Customer)(first_name__icontains=user_id).first()
                     
                 if not user:
                     return {"success": False, "action": action, "error": f"Không tìm thấy người dùng {user_id}"}
@@ -396,15 +403,15 @@ def execute_tool_call(action, payload):
             from api.models.product import Product  # type: ignore
             from api.models.productdetail import ProductDetail  # type: ignore
             try:
-                product = Product.objects(name__iexact=product_id).first()
+                product = _objects(Product)(name__iexact=product_id).first()
                 if not product:
                     from bson.errors import InvalidId  # type: ignore
                     try:
-                        product = Product.objects(id=product_id).first()
+                        product = _objects(Product)(id=product_id).first()
                     except InvalidId:
                         return {"success": False, "action": action, "error": "Không tìm thấy sản phẩm"}
                 
-                detail = ProductDetail.objects(product=product).first()
+                detail = _objects(ProductDetail)(product=product).first()
                 if detail:
                     detail.inStock = in_stock
                     detail.save()

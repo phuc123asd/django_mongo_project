@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import urllib.parse
+from typing import Any
 
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -13,13 +14,20 @@ from rest_framework.response import Response
 
 from api.models.order import Order
 
-VNPAY_TMN_CODE = config("VNPAY_TMN_CODE", default="")
-VNPAY_HASH_SECRET = config("VNPAY_HASH_SECRET", default="")
+def _env_str(name: str, default: str) -> str:
+    value = config(name, default=default)
+    return str(value)
 
-VNPAY_PAYMENT_URL = config(
-    "VNPAY_PAYMENT_URL", default="https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+def _objects(model: Any) -> Any:
+    return model.objects
+
+VNPAY_TMN_CODE = _env_str("VNPAY_TMN_CODE", "")
+VNPAY_HASH_SECRET = _env_str("VNPAY_HASH_SECRET", "")
+
+VNPAY_PAYMENT_URL = _env_str(
+    "VNPAY_PAYMENT_URL", "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 )
-FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
+FRONTEND_URL = _env_str("FRONTEND_URL", "http://localhost:3000")
 USD_TO_VND = config("USD_TO_VND", default=25000, cast=int)
 MIN_PAYMENT_VND = 1000
 MAX_PAYMENT_VND = 50000000
@@ -72,7 +80,7 @@ def create_vnpay_payment(request):
         )
 
     try:
-        order = Order.objects.get(id=order_id)
+        order = _objects(Order).get(id=order_id)
     except (DoesNotExist, ValidationError):
         return Response({"error": "Không tìm thấy đơn hàng"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -150,7 +158,7 @@ def confirm_vnpay_payment(request):
     )
 
     try:
-        order = Order.objects.get(id=order_id)
+        order = _objects(Order).get(id=order_id)
         order.payment_status = "paid" if is_success else "failed"
         order.save()
     except (DoesNotExist, ValidationError):

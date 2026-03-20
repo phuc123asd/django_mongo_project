@@ -1,7 +1,11 @@
 # api/services/order_service.py
+from typing import Any
 from api.models.order import Order
 from bson.errors import InvalidId
 from mongoengine.errors import DoesNotExist
+
+def _objects(model: Any) -> Any:
+    return model.objects
 
 def approve_multiple_orders(order_ids):
     """
@@ -16,7 +20,7 @@ def approve_multiple_orders(order_ids):
     try:
         # Nếu không có order_ids, duyệt tất cả đơn hàng đang xử lý
         if not order_ids:
-            orders_to_approve = Order.objects(status='Đang Xử Lý')
+            orders_to_approve = _objects(Order)(status='Đang Xử Lý')
             if not orders_to_approve:
                 return {
                     "success": False,
@@ -43,7 +47,7 @@ def approve_multiple_orders(order_ids):
         
         for order_id in order_ids:
             try:
-                order = Order.objects(id=order_id).first()
+                order = _objects(Order)(id=order_id).first()
                 if not order:
                     failed_orders.append(f"Đơn hàng {order_id} không tồn tại")
                     continue
