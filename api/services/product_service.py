@@ -265,6 +265,7 @@ def update_product(payload):
         
         # 4. Update Product fields if provided
         updated_fields = []
+        main_image_updated = False
         
         if 'name' in payload:
             product_to_update.name = payload['name']
@@ -281,6 +282,12 @@ def update_product(payload):
         if 'image' in payload:
             product_to_update.image = payload['image']
             updated_fields.append("ảnh chính")
+            main_image_updated = True
+
+        if 'mainImage' in payload:
+            product_to_update.image = payload['mainImage']
+            updated_fields.append("ảnh đại diện")
+            main_image_updated = True
             
         if 'category' in payload:
             product_to_update.category = payload['category']
@@ -302,6 +309,13 @@ def update_product(payload):
         if 'images' in payload:
             product_detail.images = payload['images']
             updated_fields.append("danh sách ảnh")
+
+        if 'galleryImages' in payload:
+            gallery_images = payload['galleryImages']
+            if not isinstance(gallery_images, list):
+                gallery_images = []
+            product_detail.images = gallery_images
+            updated_fields.append("ảnh thư viện")
             
         if 'reviewCount' in payload:
             product_detail.reviewCount = payload['reviewCount']
@@ -331,6 +345,17 @@ def update_product(payload):
         if 'hasARView' in payload:
             product_detail.hasARView = payload['hasARView']
             updated_fields.append("tính năng AR")
+
+        # Đồng bộ an toàn giữa ảnh đại diện và thư viện để tránh trạng thái lỗi.
+        # Nếu chưa cập nhật mainImage nhưng main hiện tại rỗng, ưu tiên lấy ảnh đầu thư viện.
+        if not main_image_updated and not product_to_update.image and product_detail.images:
+            product_to_update.image = product_detail.images[0]
+            updated_fields.append("tự động đồng bộ ảnh đại diện")
+
+        # Nếu thư viện rỗng nhưng có ảnh đại diện, đẩy vào thư viện để dữ liệu nhất quán.
+        if (not product_detail.images) and product_to_update.image:
+            product_detail.images = [product_to_update.image]
+            updated_fields.append("tự động đồng bộ ảnh thư viện")
         
         # 6. Save the changes
         product_to_update.save()

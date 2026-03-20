@@ -128,13 +128,30 @@ def chatbot(request):
                     status=400
                 )
 
-            # Ưu tiên payload có cấu trúc từ form. Ảnh upload mới sẽ được nối vào images.
-            existing_images = payload.get("images", [])
-            if not isinstance(existing_images, list):
-                existing_images = []
-            combined_images = [*existing_images, *uploaded_image_urls]
-            if combined_images:
-                payload["images"] = combined_images
+            # Ưu tiên payload có cấu trúc từ form.
+            # - add_product: dùng images như cũ
+            # - update_product: tách mainImage (Product.image) và galleryImages (ProductDetail.images)
+            if action == "update_product":
+                existing_gallery = payload.get("galleryImages", [])
+                if not isinstance(existing_gallery, list):
+                    existing_gallery = []
+                remaining_uploaded_urls = list(uploaded_image_urls)
+
+                if payload.get("mainImageUpload"):
+                    if remaining_uploaded_urls:
+                        payload["mainImage"] = remaining_uploaded_urls[0]
+                        remaining_uploaded_urls = remaining_uploaded_urls[1:]
+                    payload.pop("mainImageUpload", None)
+
+                combined_gallery = [*existing_gallery, *remaining_uploaded_urls]
+                payload["galleryImages"] = combined_gallery
+            else:
+                existing_images = payload.get("images", [])
+                if not isinstance(existing_images, list):
+                    existing_images = []
+                combined_images = [*existing_images, *uploaded_image_urls]
+                if combined_images:
+                    payload["images"] = combined_images
 
             result = execute_tool_call(action, payload)
             return JsonResponse(result)
