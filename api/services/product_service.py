@@ -4,6 +4,53 @@ from mongoengine.errors import ValidationError, NotUniqueError
 from bson.errors import InvalidId
 import cloudinary.uploader
 import json
+
+
+def _normalize_specifications(specifications_raw):
+    if specifications_raw is None:
+        return {}
+
+    if isinstance(specifications_raw, dict):
+        normalized = {}
+        for k, v in specifications_raw.items():
+            key = str(k).strip()
+            if key:
+                normalized[key] = "" if v is None else str(v).strip()
+        return normalized
+
+    if isinstance(specifications_raw, list):
+        normalized = {}
+        for item in specifications_raw:
+            if isinstance(item, dict):
+                key = str(item.get("key", "")).strip()
+                if key:
+                    normalized[key] = str(item.get("value", "")).strip()
+            elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                key = str(item[0]).strip()
+                if key:
+                    normalized[key] = "" if item[1] is None else str(item[1]).strip()
+        return normalized
+
+    if isinstance(specifications_raw, str):
+        raw = specifications_raw.strip()
+        if not raw:
+            return {}
+
+        try:
+            parsed = json.loads(raw)
+            return _normalize_specifications(parsed)
+        except Exception:
+            normalized = {}
+            parts = raw.split(',')
+            for part in parts:
+                if ':' in part:
+                    k, v = part.split(':', 1)
+                    key = k.strip()
+                    if key:
+                        normalized[key] = v.strip()
+            return normalized
+
+    return {}
 def get_public_id_from_cloudinary_url(url: str):
     """
     Trích public_id từ URL Cloudinary chuẩn.
@@ -84,18 +131,7 @@ def add_product(payload):
             except:
                 features = [f.strip() for f in features.split(',')] if features else []
         
-        specifications = payload.get('specifications', {})
-        if isinstance(specifications, str):
-            try:
-                specifications = json.loads(specifications)
-            except:
-                # Nếu là chuỗi thường dạng "Key: Value, Key: Value"
-                specifications = {}
-                parts = payload.get('specifications', '').split(',')
-                for part in parts:
-                    if ':' in part:
-                        k, v = part.split(':', 1)
-                        specifications[k.strip()] = v.strip()
+        specifications = _normalize_specifications(payload.get('specifications', {}))
 
         # 5. Tạo và lưu đối tượng ProductDetail
         product_detail = ProductDetail(
@@ -284,16 +320,7 @@ def update_product(payload):
             updated_fields.append("tính năng")
             
         if 'specifications' in payload:
-            specifications = payload['specifications']
-            if isinstance(specifications, str):
-                try: specifications = json.loads(specifications)
-                except:
-                    specifications = {}
-                    parts = payload['specifications'].split(',')
-                    for part in parts:
-                        if ':' in part:
-                            k, v = part.split(':', 1)
-                            specifications[k.strip()] = v.strip()
+            specifications = _normalize_specifications(payload['specifications'])
             product_detail.specifications = specifications
             updated_fields.append("thông số kỹ thuật")
             
@@ -337,4 +364,3 @@ def update_product(payload):
             "action": "update_product",
             "error": f"Đã xảy ra lỗi khi cập nhật sản phẩm: {e}"
         }
-

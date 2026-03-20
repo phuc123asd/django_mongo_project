@@ -24,12 +24,23 @@ def chatbot(request):
 
     question = ""
     role = ""
+    is_form_submit = False
+    form_payload = None
+    uploaded_image_urls = []
     
     if request.content_type and 'multipart/form-data' in request.content_type:
         print(f"[CHATBOT] Xử lý request dạng multipart/form-data")
         question = request.POST.get('question', '')
         role = request.POST.get('role', '')
         is_form_submit = request.POST.get('is_form_submit', 'false') == 'true'
+        form_payload_raw = request.POST.get('form_payload', '')
+        if form_payload_raw:
+            try:
+                parsed_payload = json.loads(form_payload_raw)
+                if isinstance(parsed_payload, dict):
+                    form_payload = parsed_payload
+            except Exception:
+                form_payload = None
         print(f"[CHATBOT] Question: {question}")
         print(f"[CHATBOT] Role: {role}")
         
@@ -47,6 +58,7 @@ def chatbot(request):
                     # In URL ra console để kiểm tra
                     print(f"  - Upload thành công file '{file.name}'. URL: {image_url}")
                     # Thêm URL vào danh sách để sử dụng sau
+                    uploaded_image_urls.append(image_url)
                     question += " " + image_url + " "
                 except Exception as e:
                     # In ra lỗi nếu có
@@ -58,6 +70,9 @@ def chatbot(request):
             question = data.get("question", "")
             role = data.get("role", "")
             is_form_submit = data.get("is_form_submit", False)
+            raw_payload = data.get("form_payload")
+            if isinstance(raw_payload, dict):
+                form_payload = raw_payload
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON payload"}, status=400)
     if role == 'user':
@@ -104,6 +119,25 @@ def chatbot(request):
         return JsonResponse({"answer": answer})
     else:
         # True Agent: OpenAI Function Calling
+        if is_form_submit and isinstance(form_payload, dict):
+            action = form_payload.get("action")
+            payload = form_payload.get("payload", {})
+            if not action or not isinstance(payload, dict):
+                return JsonResponse(
+                    {"success": False, "error": "Dữ liệu form_payload không hợp lệ."},
+                    status=400
+                )
+
+            # Ưu tiên payload có cấu trúc từ form. Ảnh upload mới sẽ được nối vào images.
+            existing_images = payload.get("images", [])
+            if not isinstance(existing_images, list):
+                existing_images = []
+            combined_images = [*existing_images, *uploaded_image_urls]
+            if combined_images:
+                payload["images"] = combined_images
+
+            result = execute_tool_call(action, payload)
+            return JsonResponse(result)
         
         system_prompt = (
             "Bạn là AI Agent Admin thông minh quản lý cửa hàng TechHub. "
